@@ -1,0 +1,116 @@
+/*
+2. Koristeći CUDA tehnologiju, sastaviti program koji u matrici A koja ima proizvoljne
+dimenzije nalazi minimalni i maksimalni element svake od kolona. Maksimalno redukovati broj
+pristupa globalnoj memoriji. Obratiti pažnju na efikasnost paralelizacije. Omogućiti rad
+programa za matrice proizvoljne veličine.*/
+
+#ifdef __CUDACC__
+#define cuda_SYNCTHREADS() __syncthreads()
+#else
+#define cuda_SYNCTHREADS()
+#endif
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <cuda.h>
+#include <device_functions.h>
+#include <cuda_runtime_api.h>
+
+#include <stdio.h>
+#include"math.h"
+#include"stdlib.h"
+
+#define VRSTE 4
+#define KOLONE 6
+#define THREADS 4
+
+
+__global__ void kernel(int* a, int* minimumi, int* maksimumi) {
+	int tid = threadIdx.x;
+	__shared__ int local_mins[THREADS];
+	__shared__ int local_maxs[THREADS];
+	int slice = VRSTE / THREADS;
+	int local_min = INT_MAX;
+	int local_max = INT_MIN;
+	int start = tid * slice;
+	int end = start + slice;
+	if (tid == THREADS - 1) {
+		end += VRSTE % THREADS;
+	}
+	for (int i = start; i < end; i++)
+	{
+		int tmp = a[i*KOLONE + blockIdx.x];
+		if (tmp < local_min)
+			local_min = tmp;
+		if (tmp > local_max)
+			local_max = tmp;
+	}
+	local_mins[tid] = local_min;
+	local_maxs[tid] = local_max;
+	cuda_SYNCTHREADS();
+
+	int half = THREADS;
+	do {
+		cuda_SYNCTHREADS();
+		half /= 2;
+		if (tid < half) {
+			int min = local_mins[tid];
+			int max = local_maxs[tid];
+			if (min > local_mins[tid + half])
+				local_mins[tid] = local_mins[tid + half];
+			if (max < local_maxs[tid + half])
+				local_maxs[tid] = local_maxs[tid + half];
+		}
+	} while (half != 1);
+	if (tid == 0) {
+		minimumi[blockIdx.x] = local_mins[0];
+		maksimumi[blockIdx.x] = local_maxs[0];
+	}
+}
+
+int main() {
+	int ha[VRSTE*KOLONE];
+	int hmin[KOLONE], hmax[KOLONE];
+	int *db;
+	int *dmin, *dmax;
+
+	for (int i = 0; i < VRSTE; i++) {
+		for (int j = 0; j < KOLONE; j++)
+			ha[i*KOLONE + j] = rand() % 100;
+	}
+	printf("MATRICA A \n");
+	for (int i = 0; i < VRSTE; i++) {
+		for (int j = 0; j < KOLONE; j++)
+			printf(" %d ", ha[i*KOLONE + j]);
+		printf("\n");
+	}
+	printf("\n");
+
+	cudaMalloc((void**)&db, sizeof(int)*VRSTE*KOLONE);
+	cudaMalloc((void**)&dmin, sizeof(int)*KOLONE);
+	cudaMalloc((void**)&dmax, sizeof(int)*KOLONE);
+
+	cudaMemcpy(dmin, hmin, sizeof(int)*KOLONE, cudaMemcpyHostToDevice);
+	cudaMemcpy(dmax, hmax, sizeof(int)*KOLONE, cudaMemcpyHostToDevice);
+	cudaMemcpy(db, ha, sizeof(int)*VRSTE*KOLONE, cudaMemcpyHostToDevice);
+	kernel << <KOLONE, THREADS >> > (db, dmin, dmax);
+	cudaMemcpy(hmin, dmin, sizeof(int)*KOLONE, cudaMemcpyDeviceToHost);
+	cudaMemcpy(hmax, dmax, sizeof(int)*KOLONE, cudaMemcpyDeviceToHost);
+	printf("\n");
+
+	printf("Minimumi kolona: \n");
+	for (int i = 0; i < KOLONE; i++)
+		printf("%d ", hmin[i]);
+	printf("\n");
+	printf("Maksimumi kolona: \n");
+	for (int i = 0; i < KOLONE; i++)
+		printf("%d ", hmax[i]);
+	printf("\n");
+
+	cudaFree(db);
+	cudaFree(dmin);
+	cudaFree(dmax);
+
+	return 0;
+}
+
+

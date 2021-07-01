@@ -1,0 +1,598 @@
+------------------------------------------ Zadatak 1 ---------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 6
+#define p 2
+
+void main(int argc, char** argv)
+{
+	int rank, size, a[n][n];
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
+	int local_min = INT_MAX;
+	int result;
+
+	int recv[n / p * n / 2];
+
+	MPI_Datatype even_rows, rows;
+	MPI_Type_vector(n / p * n / 2, 1, 2, MPI_INT, &even_rows);
+	MPI_Type_commit(&even_rows);
+	MPI_Type_create_resized(even_rows, 0, sizeof(int), &rows);
+	MPI_Type_commit(&rows);
+
+
+	if (rank == 0) {
+		printf("Moj rank je: %d, a moj size je: %d \n", rank, size);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 100-50;
+			}
+		}
+		printf("Matrica u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+		for (int i = 1; i < size; i++) {
+			MPI_Send(&a[n / p * (i-1)][0], 1, even_rows, i, 3, MPI_COMM_WORLD);
+		}
+		//MPI_Scatter(a, 1, rows, recv, n / p * n / 2, MPI_INT, 0, MPI_COMM_WORLD);
+
+	}
+	else {
+		MPI_Recv(&recv, n / p * n / 2, MPI_INT, 0, 3, MPI_COMM_WORLD, &status);
+		printf("Proces sa rankom %d je primio:  ", rank);
+		for (int i = 0; i < n / p * n / 2; i++) {
+			printf("%d ", recv[i]);
+			if (local_min > recv[i]) {
+				local_min = recv[i];
+			}
+		}
+		printf("\n");
+	}
+
+	MPI_Reduce(&local_min, &result, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
+
+	if (rank == 0) {
+		printf("Minimum je: %d \n", result);
+	}
+
+
+	MPI_Finalize();
+}
+
+
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 6
+#define p 3
+
+void main(int argc, char** argv)
+{
+	int rank, size, a[n][n];
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
+	int local_min = INT_MAX;
+	int result;
+
+	int recv[n / p * n / 2];
+
+	MPI_Datatype even_rows, rows;
+	MPI_Type_vector(n / p * n / 2, 1, 2, MPI_INT, &even_rows);
+	MPI_Type_commit(&even_rows);
+	MPI_Type_create_resized(even_rows, 0, n/p*n*sizeof(int), &rows);
+	MPI_Type_commit(&rows);
+
+
+	if (rank == 0) {
+		printf("Moj rank je: %d, a moj size je: %d \n", rank, size);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 10;
+			}
+		}
+		printf("Matrica u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+	}
+	MPI_Scatter(a, 1, rows, recv, n / p * n / 2, MPI_INT, 0, MPI_COMM_WORLD);
+
+	printf("Proces sa rankom %d je primio:  ", rank);
+	for (int i = 0; i < n / p * n / 2; i++) {
+		printf("%d ", recv[i]);
+		if (local_min > recv[i]) {
+			local_min = recv[i];
+		}
+	}
+	printf("\n");
+
+	MPI_Reduce(&local_min, &result, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
+
+	if (rank == 0) {
+		printf("Minimum je: %d \n", result);
+	}
+
+
+	MPI_Finalize();
+}
+
+------------------------------------------ Zadatak 2 ---------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 6
+#define p 3
+
+void main(int argc, char** argv)
+{
+	int rank, size, a[n][n];
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
+	int local_max = INT_MIN;
+	int result;
+
+	int recv[n / p * n / 2];
+
+	MPI_Datatype even_rows, rows;
+	MPI_Type_vector(n / 2, n/p, 2*n, MPI_INT, &even_rows);
+	MPI_Type_commit(&even_rows);
+	MPI_Type_create_resized(even_rows, 0, n / p * sizeof(int), &rows);
+	MPI_Type_commit(&rows);
+
+
+	if (rank == 0) {
+		printf("Moj rank je: %d, a moj size je: %d \n", rank, size);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 10;
+			}
+		}
+		printf("Matrica u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+	}
+	MPI_Scatter(a, 1, rows, recv, n / p * n / 2, MPI_INT, 0, MPI_COMM_WORLD);
+
+	printf("Proces sa rankom %d je primio:  ", rank);
+	for (int i = 0; i < n / p * n / 2; i++) {
+		printf("%d ", recv[i]);
+		if (local_max < recv[i]) {
+			local_max = recv[i];
+		}
+	}
+	printf("\n");
+
+	MPI_Reduce(&local_max, &result, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+
+	if (rank == 0) {
+		printf("Maksimim je: %d \n", result);
+	}
+
+
+	MPI_Finalize();
+}
+
+------------------------------------------ Zadatak 3 ---------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 5
+#define p 5
+
+void main(int argc, char** argv)
+{
+	int rank, size, a[n][n];
+	int local_matrix[n][n];
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
+	int k = 0;
+
+	int recv_above[(n - 1)*n], recv_under[n - 1];
+
+	MPI_Datatype above_diagonal[n - 1], under_diagonal[n - 1];
+	for (int i = 1; i < n; i++) {
+		MPI_Type_vector(n - i, 1, n + 1, MPI_INT, &above_diagonal[i - 1]);
+		MPI_Type_commit(&above_diagonal[i - 1]);
+		MPI_Type_vector(n - i, 1, n + 1, MPI_INT, &under_diagonal[i - 1]);
+		MPI_Type_commit(&under_diagonal[i - 1]);
+	}
+	MPI_Datatype column;
+	MPI_Type_vector(n - rank, 1, n, MPI_INT, &column);
+	MPI_Type_commit(&column);
+
+	if (rank == 0) {
+		printf("Moj rank je: %d, a moj size je: %d \n", rank, size);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 10 +1;
+			}
+		}
+		printf("Matrica u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+		for (int i = 1; i < size; i++) {
+			// za dijagonalu iznad
+			MPI_Send(&a[0][i], 1, above_diagonal[i - 1], i, 1, MPI_COMM_WORLD);
+			// za dijagonalu ispod
+			MPI_Send(&a[i][0], 1, under_diagonal[i - 1], i, 2, MPI_COMM_WORLD);
+		}
+
+	}
+	else {
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				local_matrix[i][j] = 0;
+			}
+		}
+		printf("Proces sa rankom %d je primio:  ", rank);
+		// za dijagonalu iznad
+		MPI_Recv(&local_matrix[0][0], 1, column, 0, 1, MPI_COMM_WORLD, &status);
+		// za dijagonalu ispod
+		MPI_Recv(&local_matrix[0][1], 1, column, 0, 2, MPI_COMM_WORLD, &status);
+
+		//// za dijagonalu iznad
+		//MPI_Recv(&recv_above, (n - rank)*n, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
+		//// za dijagonalu ispod
+		//MPI_Recv(&recv_under, (n - rank)*n, MPI_INT, 0, 2, MPI_COMM_WORLD, &status);
+
+		//for (int i = 0; i < n - rank; i++) {
+		//	if (recv_above[i]) {
+		//		printf("%d ", recv_above[i]);
+		//	}
+		//}
+		//printf(" ||||| ");
+		//for (int i = 0; i < n - rank; i++) {
+		//	printf("%d ", recv_under[i]);
+		//}
+		//printf("\n");
+
+
+		/*for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				if (k < n - rank) {
+					local_matrix[j][i] = recv_above[k];
+					k++;
+				}
+				else
+					local_matrix[j][i] = 0;
+			}
+		}
+		k = 0;
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				if ((k < n - rank) && local_matrix[j][i] == 0) {
+					local_matrix[j][i] = recv_under[k];
+					k++;
+				}
+
+			}
+		}*/
+
+
+		printf("Matrica u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", local_matrix[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+
+	MPI_Finalize();
+}
+------------------------------------------ Zadatak 4 ---------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 5
+#define p 5
+
+void main(int argc, char** argv)
+{
+	int rank, size, a[n][n];
+	int local_matrix[n][n];
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
+
+	MPI_Datatype above_diagonal[n - 1], under_diagonal[n - 1];
+	for (int i = 1; i < n; i++) {
+		MPI_Type_vector(n - i, 1, n - 1, MPI_INT, &above_diagonal[i - 1]);
+		MPI_Type_commit(&above_diagonal[i - 1]);
+		MPI_Type_vector(n - i, 1, n - 1, MPI_INT, &under_diagonal[i - 1]);
+		MPI_Type_commit(&under_diagonal[i - 1]);
+	}
+	MPI_Datatype column;
+	MPI_Type_vector(n - rank, 1, n, MPI_INT, &column);
+	MPI_Type_commit(&column);
+
+	if (rank == 0) {
+		printf("Moj rank je: %d, a moj size je: %d \n", rank, size);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 10 + 1;
+			}
+		}
+		printf("Matrica u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+		for (int i = 1; i < size; i++) {
+			// za dijagonalu iznad
+			MPI_Send(&a[0][n - i - 1], 1, above_diagonal[i - 1], i, 1, MPI_COMM_WORLD);
+			// za dijagonalu ispod
+			MPI_Send(&a[i][n - 1], 1, under_diagonal[i - 1], i, 2, MPI_COMM_WORLD);
+		}
+
+	}
+	else {
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				local_matrix[i][j] = 0;
+			}
+		}
+		printf("Proces sa rankom %d je primio:  ", rank);
+		// za dijagonalu iznad
+		MPI_Recv(&local_matrix[0][0], 1, column, 0, 1, MPI_COMM_WORLD, &status);
+		// za dijagonalu ispod
+		MPI_Recv(&local_matrix[0][1], 1, column, 0, 2, MPI_COMM_WORLD, &status);
+
+		printf("Matrica u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", local_matrix[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+
+	MPI_Finalize();
+}
+------------------------------------------ Zadatak 5 ---------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 3
+#define m 3
+#define k 4
+#define p 2
+
+void main(int argc, char** argv)
+{
+	int rank, size, a[m][n], b[n][k],c[m][k];
+	int local_b[n][k / p];
+	int local_c[m][k / p];
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
+
+	MPI_Datatype column_not_resized, column;
+	MPI_Type_vector(n, k / p, k, MPI_INT, &column_not_resized);
+	MPI_Type_commit(&column_not_resized);
+
+	MPI_Type_create_resized(column_not_resized, 0, k / p * sizeof(int), &column);
+	MPI_Type_commit(&column);
+
+	if (rank == 0) {
+		printf("Moj rank je: %d, a moj size je: %d \n", rank, size);
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 2 + 1;
+			}
+		}
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < k; j++) {
+				b[i][j] = rand() % 2 + 1;
+			}
+		}
+		printf("Matrica A u procesu: %d \n", rank);
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+		printf("Matrica B u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < k; j++) {
+				printf("%d ", b[i][j]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+	MPI_Scatter(b, 1, column, local_b, n*k / p, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(a, n*m, MPI_INT, 0, MPI_COMM_WORLD);
+
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k / p; j++) {
+			local_c[i][j] = 0;
+		}
+	}
+
+	printf("Matrica B u procesu: %d \n", rank);
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < k / p; j++) {
+			printf("%d ", local_b[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	for (int i = 0; i < m; ++i) {
+		for (int j = 0; j < k/p; ++j) {
+			for (int q = 0; q < n; ++q) {
+				local_c[i][j] += a[i][q] * local_b[q][j];
+			}
+		}
+	}
+
+	printf("Matrica Local_C u procesu: %d \n", rank);
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k/p; j++) {
+			printf("%d ", local_c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	MPI_Gather(local_c, m*k / p, MPI_INT, c, m*k/p, MPI_INT, 0, MPI_COMM_WORLD);
+
+	if (rank == 0) {
+		printf("Matrica A*B u procesu: %d \n", rank);
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < k ; j++) {
+				printf("%d ", c[i][j]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+
+	MPI_Finalize();
+}
+
+
+------------------------------------------ Zadatak 6 ---------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 4
+#define p 4
+
+void main(int argc, char** argv)
+{
+	int rank, size, a[n][n], b[n][n], c[n][n];
+	int max[n];
+	int local_a[n / p][n];
+	int local_c[n / p][n];
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
+
+	MPI_Datatype row_not_resized, row;
+	MPI_Type_vector(n/p, n, n, MPI_INT, &row_not_resized);
+	MPI_Type_commit(&row_not_resized);
+
+	MPI_Type_create_resized(row_not_resized, 0, n / p * n * sizeof(int), &row);
+	MPI_Type_commit(&row);
+
+	if (rank == 0) {
+		printf("Moj rank je: %d, a moj size je: %d \n", rank, size);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 2 + 1;
+				b[i][j] = rand() % 2;
+			}
+		}
+		printf("Matrica A u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+		printf("Matrica B u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", b[i][j]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+	MPI_Scatter(a, 1, row, local_a, n*n / p, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(b, n*n, MPI_INT, 0, MPI_COMM_WORLD);
+
+	for (int i = 0; i < n/p; i++) {
+		for (int j = 0; j < n; j++) {
+			local_c[i][j] = 0;
+		}
+	}
+
+	printf("Matrica A u procesu: %d \n", rank);
+	for (int i = 0; i < n/p; i++) {
+		for (int j = 0; j < n; j++) {
+			printf("%d ", local_a[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	for (int i = 0; i < n/p; ++i) {
+		for (int j = 0; j < n; ++j) {
+			for (int q = 0; q < n; ++q) {
+				local_c[i][j] += local_a[i][q] * b[q][j];
+			}
+		}
+	}
+
+	printf("Matrica Local_C u procesu: %d \n", rank);
+	for (int i = 0; i < n/p; i++) {
+		for (int j = 0; j < n; j++) {
+			printf("%d ", local_c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	MPI_Gather(local_c, n*n / p, MPI_INT, c, n*n / p, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&local_c, &max, n, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+
+	if (rank == 0) {
+		printf("Matrica A*B u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", c[i][j]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+		printf("\nMaksimumi po kolonama: \n");
+		for (int i = 0; i < n; i++)
+			printf("%d ", max[i]);
+	}
+
+	MPI_Finalize();
+}
+
+
+

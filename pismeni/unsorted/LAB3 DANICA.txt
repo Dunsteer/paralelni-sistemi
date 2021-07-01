@@ -1,0 +1,212 @@
+Zadatak 1
+
+
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 6
+#define p 3
+
+void main(int argc, char** argv)
+{
+	int rank, size, a[n][n];
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Status status;
+	int local_min = INT_MAX;
+	int result;
+
+	int recv[n*n / 2 / p];
+
+	MPI_Datatype even_rows, rows;
+	MPI_Type_vector(n, 1, n, MPI_INT, &even_rows);
+	MPI_Type_commit(&even_rows);
+	MPI_Type_create_resized(even_rows, 0, 2 * sizeof(int), &rows);
+	MPI_Type_commit(&rows);
+
+
+	if (rank == 0) {
+		printf("Moj rank je: %d, a moj size je: %d \n", rank, size);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 10-5;
+			}
+		}
+		printf("Matrica u procesu: %d \n", rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+	}
+	MPI_Scatter(a, 1, rows, recv, n*n / 2 / p, MPI_INT, 0, MPI_COMM_WORLD);
+
+	printf("Proces sa rankom %d je primio:  ", rank);
+	for (int i = 0; i < n*n / 2 / p; i++) {
+		printf("%d ", recv[i]);
+		if (local_min > recv[i]) {
+			local_min = recv[i];
+		}
+	}
+	printf("\n");
+
+	MPI_Reduce(&local_min, &result, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
+
+	if (rank == 0) {
+		printf("Minimum je: %d \n", result);
+	}
+
+
+	MPI_Finalize();
+}
+
+
+Zadatak 5
+
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 4
+#define m 3
+#define k 4
+#define p 2
+
+void main(int argc, char** argv)
+{
+	int rank, a[m][n], b[n][k], c[m][k], local_c[m][k], local_b[n][k / p];
+	MPI_Datatype column, resize_column;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Type_vector(n, k / p, n, MPI_INT, &column);
+	MPI_Type_commit(&column);
+	MPI_Type_create_resized(column, 0, k / p * sizeof(int), &resize_column);
+	MPI_Type_commit(&resize_column);
+
+	if (rank == 0) {
+		printf("\nMATRICA A proces 0\n");
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 3;
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+		printf("\nMATRICA B\n");
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < k; j++) {
+				b[i][j] = rand() % 3;
+				printf("%d ", b[i][j]);
+			}
+			printf("\n");
+		}
+	}
+	MPI_Scatter(b, 1, resize_column, local_b, k / p * n, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Bcast(a, m*n, MPI_INT, 0, MPI_COMM_WORLD);
+
+	printf("\nJa sam proces sa rankom %d i moje matrice A i local_B su\n", rank);
+	printf("\nMATRICA A\n");
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < n; j++) {
+			a[i][j] = rand() % 3;
+			printf("%d ", a[i][j]);
+		}
+		printf("\n");
+	}
+
+	printf("\nMATRICA local_B\n");
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < k / p; j++) {
+			printf("%d ", local_b[i][j]);
+		}
+		printf("\n");
+	}
+
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k; j++) {
+			local_c[i][j] = 0;
+		}
+	}
+
+	for (int i = 0; i < m; i++)
+		for (int j = 0; j < k / p; j++)
+			for (int s = 0; s < n; s++)
+				local_c[i][j + rank * k / p] += a[i][s] * local_b[s][j];
+
+
+	printf("\nMATRICA local_C proces %d\n", rank);
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k; j++) {
+			printf("%d ", local_c[i][j]);
+		}
+		printf("\n");
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Reduce(local_c, c, m*k, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+	//MPI_Gather(local_c, 1, gather_column_resized, c, m, MPI_INT, 0, MPI_COMM_WORLD);
+
+	if (rank == 0) {
+		printf("\nMATRICA C proces 0\n");
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < k; j++) {
+				printf("%d ", c[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+	MPI_Finalize();
+}
+
+------------------------------------ Zadatak 6 --------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 4
+#define m 3
+
+int main(int argc, char* argv[])
+{
+	/*Napisati MPI program kojim se kreira dvodimenzionalna Cartesian struktura sa n vrsta i m kolona.
+	Za svaki skup procesa koji pripadaju istoj koloni strukture kreirati novi komunikator. Master procesu
+	iz svake kolone poslati koordinate procesa sa najvećim identifikatorom i prikazati ih.*/
+
+	int rank, row, column, local_max, final_max = INT_MIN;
+	MPI_Comm cartesian, colums;
+	int dims[2] = { n, m };
+	int periods[2] = { 0,0 };
+	int coords[2];
+	int new_rank, color = 0;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &cartesian);
+	MPI_Cart_coords(cartesian, rank, 2, coords);
+
+	color = coords[1] % m;
+
+	MPI_Comm_split(MPI_COMM_WORLD, color, 0, &colums);
+	MPI_Comm_rank(colums, &new_rank);
+
+
+	printf("Proces sa rankom %d ima koordinate u matrici %d, %d i novi rank mu je %d i color mu je %d \n", rank, coords[0], coords[1], new_rank, color);
+	// nije mi logicno da local_mac bude jednak new rank, jer je onda max uvek n-1
+	local_max = rank;
+
+	MPI_Reduce(&local_max, &final_max, 1, MPI_INT, MPI_MAX, 0, colums);
+
+	if (new_rank == 0)
+	{
+		printf("Maksimalni identifikator za kolonu %d je %d  \n", color, final_max);
+	}
+
+	MPI_Finalize();
+
+}

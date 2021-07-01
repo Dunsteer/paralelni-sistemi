@@ -1,0 +1,120 @@
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 4
+#define m 4
+#define k 3
+#define p 2
+
+struct maxStr
+{
+	int max;
+	int rank;
+};
+
+
+int main(int argc, char* argv[])
+{
+	int rank, a[m][n], b[n][k], c[m][k], local_c[m][k], local_a[m][n/p], local_b[n/p][k];
+	maxStr local_max, max;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Datatype column, column_resized, row, row_resized;
+	MPI_Type_vector(m*n / p, 1, p, MPI_INT, &column);
+	MPI_Type_commit(&column);
+	MPI_Type_create_resized(column, 0, sizeof(int), &column_resized);
+	MPI_Type_commit(&column_resized);
+
+	MPI_Type_vector(n / p, k, p*k, MPI_INT, &row);
+	MPI_Type_commit(&row);
+	MPI_Type_create_resized(row, 0, k * sizeof(int), &row_resized);
+	MPI_Type_commit(&row_resized);
+
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k; j++) {
+			local_c[i][j] = 0;
+		}
+	}
+
+	if (rank == 0) {
+		printf("\nMATRICA A proces 0\n");
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 3;
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+		printf("\nMATRICA B proces 0\n");
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < k; j++) {
+				b[i][j] = rand() % 3;
+				printf("%d ", b[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	MPI_Scatter(a, 1, column_resized, local_a, n/p*m, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Scatter(b, 1, row_resized, local_b, n/p*k, MPI_INT, 0, MPI_COMM_WORLD);
+
+	printf("\nMATRICA LOCAL A proces %d\n", rank);
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < n/p; j++) {
+			printf("%d ", local_a[i][j]);
+		}
+		printf("\n");
+	}
+
+	printf("\nMATRICA LOCAL B proces %d\n", rank);
+	for (int i = 0; i < n/p; i++) {
+		for (int j = 0; j < k; j++) {
+			printf("%d ", local_b[i][j]);
+		}
+		printf("\n");
+	}
+
+	for (int i = 0; i < m; i++)
+		for (int j = 0; j < k; j++)
+			for (int s = 0; s < n/p; s++)
+				local_c[i][j] += local_a[i][s] * local_b[s][j];
+
+	printf("\nMATRICA LOCAL C proces %d\n", rank);
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k; j++) {
+			printf("%d ", local_c[i][j]);
+		}
+		printf("\n");
+	}
+
+	local_max.max = INT_MIN;
+	local_max.rank = rank;
+
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k; j++) {
+			if (local_c[i][j] > local_max.max) {
+				local_max.max = local_c[i][j];
+			}
+		}
+	}
+
+	MPI_Reduce(&local_max, &max, 1, MPI_2INT, MPI_MAXLOC, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&max, 1, MPI_2INT, 0, MPI_COMM_WORLD);
+	MPI_Reduce(local_c, c, m*k, MPI_INT, MPI_SUM, max.rank, MPI_COMM_WORLD);
+	if (max.rank == rank) {
+		printf("\nMATRICA C proces %d SA MAX ELEMENTOM\n", rank);
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < k; j++) {
+				printf("%d ", c[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+
+	MPI_Finalize();
+}

@@ -1,0 +1,281 @@
+// Tacan
+#include <iostream>
+#include <stdio.h>
+#include "mpi.h"
+#define m 6
+#define p 2
+#define n 3
+#define k 2
+
+int main(int argc, char** argv)
+{
+	int i, j, l, rank, size, a[m][n], b[n][k], c[m][k], local_a[m / p][n], local_c[m][k], min_rank;
+	struct {
+		int rank; int val;
+	} in, out;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Datatype vector, rows;
+
+	MPI_Type_vector(m / p, n, p * n, MPI_INT, &vector);
+	MPI_Type_commit(&vector);
+	MPI_Type_create_resized(vector, 0, n * sizeof(int), &rows);
+	MPI_Type_commit(&rows);
+
+	if (rank == 0)
+	{
+		for (i = 0; i < m; i++)
+			for (j = 0; j < n; j++)
+				a[i][j] = i + j;
+		for (i = 0; i < n; i++)
+			for (j = 0; j < k; j++)
+				b[i][j] = i + j;
+
+		printf("Matrica A u procesu 0:\n");
+		for (i = 0; i < m; i++)
+		{
+			for (j = 0; j < n; j++)
+				printf("%d ", a[i][j]);
+			printf("\n");
+		}
+		printf("Matrica B u procesu 0:\n");
+		for (i = 0; i < n; i++)
+		{
+			for (j = 0; j < k; j++)
+				printf("%d ", b[i][j]);
+			printf("\n");
+		}
+	}
+	MPI_Bcast(b, n * k, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Scatter(a, 1, rows, local_a, m / p * n, MPI_INT, 0, MPI_COMM_WORLD);
+
+	//svako racuna svoj deo
+	for (i = 0; i < m; i++)
+		for (j = 0; j < k; j++)
+			local_c[i][j] = 0;
+
+	for (i = 0; i < m / p; i++)
+		for (j = 0; j < k; j++)
+			for (l = 0; l < n; l++)
+				local_c[i*p + rank][j] += local_a[i][l] * b[l][j];
+
+	in.rank = rank;
+	in.val = INT_MAX;
+	for (i = 0; i < m / p; i++)
+		for (j = 0; j < k; j++)
+			if (local_c[i*p][j] < in.val)
+				in.val = local_c[i*p][j];
+
+	MPI_Reduce(&in, &out, 1, MPI_2INT, MPI_MINLOC, 0, MPI_COMM_WORLD);
+	//u procesu 0 imamo rank procesa sa najmanjim elementom
+	if (rank == 0)
+		min_rank = out.rank;
+	MPI_Bcast(&min_rank, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+	//rezultujuca matrica treba da bude u procesu min-rank
+	MPI_Reduce(local_c, c, m* k, MPI_INT, MPI_SUM, min_rank, MPI_COMM_WORLD);
+
+	if (rank == min_rank)
+	{
+		printf("\nRezultat mnozenja matrice:\n");
+		for (i = 0; i < m; i++)
+		{
+			for (j = 0; j < k; j++)
+				printf("%d ", c[i][j]);
+			printf("\n");
+		}
+	}
+
+
+	MPI_Finalize();
+	return 0;
+}
+
+
+
+
+
+
+
+// Netacan
+
+#include <stdio.h>
+#include <mpi.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define m 4
+#define k 4
+#define n 6
+#define p 2
+
+struct minStr {
+	int min;
+	int rank;
+};
+
+int main(int argc, char* argv[])
+{
+	int rank, a[m][n], b[n][k], c[m][k], local_a[m][n], local_c[m][k];
+	minStr local_min, min;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Datatype row, row_resized;
+	MPI_Type_vector(m / p, n, p*n, MPI_INT, &row);
+	MPI_Type_commit(&row);
+	MPI_Type_create_resized(row, 0, n * sizeof(int), &row_resized);
+	MPI_Type_commit(&row_resized);
+
+
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k; j++) {
+			local_c[i][j] = 0;
+		}
+	}
+
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < n; j++) {
+			local_a[i][j] = 0;
+		}
+	}
+
+	if (rank == 0) {
+		printf("\nMATRICA A\n");
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 3;
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+		printf("\nMATRICA B\n");
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < k; j++) {
+				b[i][j] = rand() % 3;
+				printf("%d ", b[i][j]);
+			}
+			printf("\n");
+		}
+	}
+	MPI_Scatter(a, 1, row_resized, local_a, 1, row_resized, 0, MPI_COMM_WORLD);
+	MPI_Bcast(b, n*k, MPI_INT, 0, MPI_COMM_WORLD);
+
+	printf("\nMATRICA A u procesu %d\n", rank);
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < n; j++) {
+			printf("%d ", local_a[i][j]);
+		}
+		printf("\n");
+	}
+
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k; j++) {
+			for (int s = 0; s < n; s++) {
+				local_c[i][j] += local_a[i][s] * b[s][j];
+			}
+		}
+	}
+
+	local_min.rank = rank;
+	local_min.min = INT_MAX;
+	for (int i = 0; i < m; i++) {
+		for (int j = 0; j < k; j++) {
+			if (local_c[i][j] < local_min.min) {
+				local_min.min = local_c[i][j];
+			}
+		}
+	}
+
+	MPI_Reduce(&local_min, &min, 1, MPI_2INT, MPI_MINLOC, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&min, 1, MPI_2INT, 0, MPI_COMM_WORLD);
+	MPI_Reduce(local_c, c, m*k, MPI_INT, MPI_SUM, min.rank, MPI_COMM_WORLD);
+
+	if (rank == min.rank) {
+		printf("\nMATRICA C u procesu %d sa minimumom %d\n", rank,min.min);
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < k; j++) {
+				printf("%d ", c[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+	MPI_Finalize();
+
+}
+
+
+
+#include <stdio.h>
+#include <mpi.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define n 4
+#define p 5 //4 workers 1 master
+
+
+int main(int argc, char* argv[])
+{
+	int rank, a[n][n], c[n][n];
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Datatype submatrix,submatrix_resized;
+	MPI_Type_vector(n / 2, n / 2, n, MPI_INT, &submatrix);
+	MPI_Type_commit(&submatrix);
+	MPI_Type_create_resized(submatrix, 0, 0, &submatrix_resized);
+	MPI_Type_commit(&submatrix_resized);
+
+	MPI_Datatype matrix_c;
+	int blklens[n], displs[n];
+	for (int i = 0; i < n; i++) {
+		blklens[i] = i + 1;
+		if (i == n - 1) {
+			blklens[i] = 2;
+		}
+		displs[i] = (i + 1)*(n - 1);
+	}
+	MPI_Type_indexed(n, blklens, displs, MPI_INT, &matrix_c);
+	MPI_Type_commit(&matrix_c);
+
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			c[i][j] = 0;
+		}
+	}
+
+	if (rank == 0) {
+		printf("\nMATRICA A\n");
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 10;
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+		for (int i = 1; i < p; i++) {
+			int row = (i - 1) / (n / 2);
+			int col = (i - 1) % (n / 2);
+			MPI_Send(&a[row*n / 2][col*n / 2], 2, submatrix_resized, i, 0, MPI_COMM_WORLD);
+		}
+	}
+	else {
+		MPI_Status status;
+		MPI_Recv(&c[0][0], 1, matrix_c, 0, 0, MPI_COMM_WORLD, &status);
+		printf("\nMATRICA C u procesu %d\n",rank);
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				printf("%d ", c[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+	MPI_Finalize();
+
+}

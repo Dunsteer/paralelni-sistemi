@@ -1,0 +1,81 @@
+#include <stdio.h>
+#include <mpi.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define n 4
+#define p 2
+
+int main(int argc, char* argv[])
+{
+	int rank, a[n][n], c[n][n];
+	int i, j;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Datatype row, recv;
+	int blklen2[n / 2 * n / 2], displ2[n / 2 * n / 2];
+	int cnt = 0;
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < n; j++) {
+			if (i % 2 == 0 && j % 2 == 0 && cnt < n / 2 * n / 2) {
+				blklen2[cnt] = 2;
+				displ2[cnt] = j * n + i;
+				cnt++;
+			}
+		}
+	}
+	MPI_Type_indexed(n / 2 * n / 2, blklen2, displ2, MPI_INT, &row);
+	MPI_Type_commit(&row);
+	for (i = 0; i < n / 2 * n / 2; i++)
+		printf("%d ", displ2[i]);
+	int blklen[n*n / 2], displ[n*n / 2];
+	cnt = 0;
+	for (j = n - 1; j >= 0; j--) {
+		for (i = n - 1; i >= 0; i--) {
+			if ((n - 1) <= (i + j) && cnt < n*n / 2) {
+				blklen[cnt] = 1;
+				displ[cnt] = i * n + j;
+				cnt++;
+			}
+		}
+	}
+	for (i = 0; i < n*n / 2; i++)
+		printf("%d ", displ[i]);
+	MPI_Type_indexed(n / 2 * n, blklen, displ, MPI_INT, &recv);
+	MPI_Type_commit(&recv);
+
+	if (rank == 0) {
+		printf("\nMATRICA A\n");
+		for (i = 0; i < n; i++) {
+			for (j = 0; j < n; j++) {
+				a[i][j] = rand() % 3;
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+
+		MPI_Send(a, 1, row, 1, 0, MPI_COMM_WORLD);
+	}
+	else {
+		for (i = 0; i < n; i++)
+			for (j = 0; j < n; j++)
+				c[i][j] = 0;
+		MPI_Status status;
+		MPI_Recv(c, 1, recv, 0, 0, MPI_COMM_WORLD, &status);
+		printf("\nMATRICA C u procesu %d\n", rank);
+		for (i = 0; i < n; i++) {
+			for (j = 0; j < n; j++) {
+				printf("%d ", c[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+
+	MPI_Finalize();
+
+}
+
+
+// Sa Type_vector

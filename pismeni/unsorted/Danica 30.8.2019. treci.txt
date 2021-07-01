@@ -1,0 +1,124 @@
+#include <stdio.h>
+#include <mpi.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define n 8
+
+int main(int argc, char* argv[])
+{
+	int rank, p, q;
+	int i, j, s;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &p);
+	q = (int)(sqrt((double)p));
+	int **a, **b, **c, **local_a, **local_b, **local_c, **final_c;
+	a = new int*[n];
+	b = new int*[n];
+	c = new int*[n];
+	final_c = new int*[n];
+	local_b = new int*[n];
+	for (i = 0; i < n; i++) {
+		a[i] = new int[n];
+		b[i] = new int[n];
+		c[i] = new int[n];
+		final_c[i] = new int[n];
+		local_b[i] = new int[n / q];
+	}
+	local_c = new int*[n / q];
+	local_a = new int*[n / q];
+	for (i = 0; i < n / q; i++) {
+		local_c[i] = new int[n / q];
+		local_a[i] = new int[n];
+	}
+
+	MPI_Datatype rows, cols, cols_resized;
+	MPI_Type_vector(n / q, n, n, MPI_INT, &rows);
+	MPI_Type_commit(&rows);
+	MPI_Type_vector(n, n / q, n, MPI_INT, &cols);
+	MPI_Type_commit(&cols);
+	MPI_Type_create_resized(cols, 0, n / q * sizeof(int), &cols_resized);
+	MPI_Type_commit(&cols_resized);
+
+if (rank == 0) {
+		printf("\nMATRICA A\n");
+		for (i = 0; i < n; i++) {
+			for (j = 0; j < n; j++) {
+				a[i][j] = rand() % 3;
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+		printf("\nMATRICA B\n");
+		for (i = 0; i < n; i++) {
+			for (j = 0; j < n; j++) {
+				b[i][j] = rand() % 3;
+				printf("%d ", b[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+	int irow, jcol, col_rank, row_rank;
+	irow = rank / q;
+	jcol = rank % q;
+	MPI_Comm colcom, rowcom;
+	MPI_Comm_split(MPI_COMM_WORLD, irow, jcol, &rowcom);
+	MPI_Comm_split(MPI_COMM_WORLD, jcol, irow, &colcom);
+	MPI_Comm_rank(colcom, &col_rank);
+	MPI_Comm_rank(rowcom, &row_rank);
+
+	MPI_Scatter(a, 1, rows, local_a, n / q * n, MPI_INT, 0, rowcom);
+	MPI_Scatter(b, 1, cols_resized, local_b, n / q * n, MPI_INT, 0, colcom);
+
+	for (i = 0; i < n / q; i++)
+		for (j = 0; j < n / q; j++)
+			local_c[i][j] = 0;
+
+	printf("\nMATRICA A u procesu %d\n", rank);
+	for (i = 0; i < n / q; i++) {
+		for (j = 0; j < n; j++) {
+			printf("%d ", local_a[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\nMATRICA B u procesu %d\n", rank);
+	for (i = 0; i < n; i++) {
+		for (j = 0; j < n / q; j++) {
+			b[i][j] = rand() % 3;
+			printf("%d ", local_b[i][j]);
+		}
+		printf("\n");
+	}
+
+	for (i = 0; i < n / q; i++)
+		for (j = 0; j < n / q; j++)
+			for (s = 0; s < n; s++)
+				local_c[i][j] += local_a[i][s] * local_b[s][j];
+
+	printf("\nMATRICA C u procesu %d\n", rank);
+	for (i = 0; i < n / q; i++) {
+		for (j = 0; j < n / q; j++) {
+			printf("%d ", local_c[i][j]);
+		}
+		printf("\n");
+	}
+
+	MPI_Gather(local_c, n / q * n / q, MPI_INT, c, n*n, MPI_INT, 0, rowcom);
+	MPI_Reduce(c, final_c, n*n, MPI_INT, MPI_SUM, 0, colcom);
+
+	if (rank == 0) {
+		printf("\nMATRICA FINAL C u procesu %d\n", rank);
+		for (i = 0; i < n; i++) {
+			for (j = 0; j < n; j++) {
+				printf("%d ", final_c[i][j]);
+			}
+			printf("\n");
+		}
+	}
+
+
+	MPI_Finalize();
+
+}

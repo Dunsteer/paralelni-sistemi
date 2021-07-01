@@ -1,0 +1,484 @@
+//------------------------------------------- Zadatak 1 ------------------------------
+// OpenMP.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+
+#include <iostream>
+#include "omp.h"
+#include "math.h"
+#include <cstdio>
+#include <ctime>
+
+/*1. Napisati sekvencijalni program kojim se vrši množenje dve matrice A i B reda N.
+Korišcenjem OpenMP direktive izvršiti paralelizaciju petlje, tako da se izvrši distribucija
+iteracija izmeu niti.
+Podesiti broj niti tako da bude jednak broju jezgara racunara. Izmeriti vreme množenja matrica
+za sekvencijalni slucaj i za slucaj posle uvoenja openMP direktiva. Uporediti oba rešenja za
+razlicite dimenzije matrica.*/
+
+#define n 3
+
+int main()
+{
+	int a[n][n], b[n][n], c[n][n], a2[n][n], b2[n][n], c2[n][n];
+	double start, end;
+
+	for (int i = 0; i < n; i++)
+	{
+		for (int j = 0; j < n; j++)
+		{
+			a[i][j] = rand() % 5;
+			a2[i][j] = a[i][j];
+			b[i][j] = rand() % 4;
+			b2[i][j] = b[i][j];
+			c[i][j] = 0;
+			c2[i][j] = 0;
+		}
+	}
+
+	// printf("\nMatrica A \n");
+	// for (int i = 0; i < n; i++)
+	// {
+	// 	for (int j = 0; j < n; j++)
+	// 	{
+	// 		printf("%d ", a[i][j]);
+	// 	}
+	// 	printf("\n");
+	// }
+
+	// printf("\nMatrica B \n");
+	// for (int i = 0; i < n; i++)
+	// {
+	// 	for (int j = 0; j < n; j++)
+	// 	{
+	// 		printf("%d ", b[i][j]);
+	// 	}
+	// 	printf("\n");
+	// }
+
+	//clock_t start2;
+	//double duration;
+
+	//start2 = clock();
+	for (int i = 0; i < n; i++)
+	{
+		for (int j = 0; j < n; j++)
+		{
+			for (int k = 0; k < n; k++)
+			{
+
+				c[i][j] += a[i][k] * b[k][j];
+			}
+		}
+	}
+	//duration = (std::clock() - start2) / (double)CLOCKS_PER_SEC;
+	//printf("\nMatrica C kod iterativnog programa izracunata za %f sec\n", duration);
+	// for (int i = 0; i < n; i++)
+	// {
+	// 	for (int j = 0; j < n; j++)
+	// 	{
+	// 		printf("%d ", c[i][j]);
+	// 	}
+	// 	printf("\n");
+	// }
+
+	int i, j, k;
+	// int broj_niti = omp_get_num_procs();
+	// printf("Broj jezgara u sistemu je %d \n", broj_niti);
+
+	// omp_set_num_threads(broj_niti);
+	// start = omp_get_wtime();
+#pragma omp parallel for //shared(a2, b2, c2) private(i, j, k)
+	for (i = 0; i < n; i++)
+	{
+		for (j = 0; j < n; j++)
+		{
+			printf("Nit %d racuna iteraciju %d, %d \n", omp_get_thread_num(), i, j);
+			for (k = 0; k < n; k++)
+			{
+				c2[i][j] += a2[i][k] * b2[k][j];
+			}
+		}
+	}
+
+	//end = omp_get_wtime();
+	//printf("\nMatrica C2 kod paralelizovanog programa izracunata za %f sec\n", (end - start));
+	// for (int i = 0; i < n; i++)
+	// {
+	// 	for (int j = 0; j < n; j++)
+	// 	{
+	// 		printf("%d ", c2[i][j]);
+	// 	}
+	// 	printf("\n");
+	// }
+}
+
+//------------------------------------------- Zadatak 2 ------------------------------
+// OpenMP.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+
+#include <iostream>
+#include "omp.h"
+#include "math.h"
+#include <cstdio>
+#include <ctime>
+
+/*2. Napisati sekvencijalni program kojim se generiše skalarni proizvod dva vektora. Napisati
+OpenMP program kojim se generiše skalarni proizvod dva vektora, podelom iteracija petlje
+izmeu razlicitih niti sa i bez korišcenja odredbe redukcije za kombinovanje parcijalnih rezultata
+u nitima. Uporediti vremena izvršenja u oba slucaja sa sekvencijalnim vremenom izvršenja.
+Uporediti ova rešenja za razlicite dimenzije vektora..*/
+
+#define n 3
+
+int main()
+{
+	int a[n], b[n], rez, rez2;
+	double start, end;
+
+	for (int i = 0; i < n; i++)
+	{
+		a[i] = rand() % 5 + 1;
+		b[i] = rand() % 4 + 1;
+	}
+
+	// printf("\nVektor A \n");
+	// for (int i = 0; i < n; i++)
+	// {
+	// 	printf("%d ", a[i]);
+	// }
+
+	// printf("\nVektor B \n");
+	// for (int i = 0; i < n; i++)
+	// {
+	// 	printf("%d ", b[i]);
+	// }
+	rez = 0;
+	for (int i = 0; i < n; i++)
+	{
+		rez += a[i] * b[i];
+	}
+	//printf("\nRezultat kod iterativnog programa %d \n", rez);
+
+	int i, j, k;
+	//int broj_niti = omp_get_num_procs();
+	//printf("Broj jezgara u sistemu je %d \n", broj_niti);
+
+	//omp_set_num_threads(broj_niti);
+	//start = omp_get_wtime();
+	rez2 = 0;
+#pragma omp parallel for reduction(+:rez2) //default(none) shared(a, b) private(i)
+	for (i = 0; i < n; i++)
+	{
+		rez2 += a[i] * b[i];
+	}
+
+	//end = omp_get_wtime();
+	//printf("\nRezultat kod PARALELNOG programa %d\n", rez2);
+}
+
+//------------------------------------------- Zadatak 3 ------------------------------
+// OpenMP.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+
+#include <iostream>
+#include "omp.h"
+#include "math.h"
+#include <cstdio>
+#include <ctime>
+
+/*3. Napisati OpenMP program kojim se pronalazi ukupan broj prostih brojeva izmeu 1 i N,
+podelom iteracija petlje izmeu razlicitih niti sa i bez korišcenja odredbe redukcije za
+kombinovanje parcijalnih rezultata u nitima. Uporediti vremena izvršenja u oba slucaja sa
+sekvencijalnim vremenom izvršenja. Uporediti ova rešenja za razlicite vrednosti N.*/
+
+#define n 12
+
+int prostBroj(int a)
+{
+	if (a == 1 || a == 2)
+		return 1;
+	for (int i = 2; i <= sqrt(a); i++)
+	{
+		if (a % i == 0)
+			return 0;
+	}
+	return 1;
+}
+
+int main()
+{
+	double start, end;
+	int i, j, k, count;
+	//int broj_niti = omp_get_num_procs();
+	//printf("Broj jezgara u sistemu je %d \n", broj_niti);
+
+	//omp_set_num_threads(broj_niti);
+	//start = omp_get_wtime();
+	count = 0;
+	// SA REDUKCIJOM
+#pragma omp parallel for reduction(+ : count) default(none) private(i)
+	for (i = 1; i <= n; i++)
+	{
+		if (prostBroj(i))
+		{
+			count += 1;
+		}
+	}
+
+	//end = omp_get_wtime();
+	//printf("\nBroj prostih brojeva izmedju 1 i %d je %d SA REDUKCIJOM, i ovo je izracunato za %f sec\n", n, count, (end - start));
+
+	// BEZ REDUKCIJE
+	//start = omp_get_wtime();
+	count = 0;
+	int tmp_count = 0;
+#pragma omp parallel firstprivate(tmp_count)
+	{
+#pragma omp for
+		for (i = 1; i < n; i++)
+		{
+			if (prostBroj(i))
+				tmp_count++;
+		}
+#pragma omp critical(primeNumbers)
+		{
+			count += tmp_count;
+		}
+	}
+	//end = omp_get_wtime();
+	//printf("\nBroj prostih brojeva izmedju 1 i %d je %d BEZ REDUKCIJE, i ovo je izracunato za %f sec\n", n, count, (end - start));
+}
+
+//------------------------------------------- Zadatak 4 ------------------------------
+// OpenMP.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+
+#include <iostream>
+#include "omp.h"
+#include "math.h"
+#include <cstdio>
+#include <ctime>
+
+/*4. Napisati OpenMP program kojim se generiše prosecna vrednost elemanata vektora, podelom
+iteracija petlje izmeu razlicitih niti sa i bez korišcenja odredbe redukcije za kombinovanje
+parcijalnih rezultata u nitima. Uporediti vremena izvršenja u oba slucaja sa sekvencijalnim
+vremenom izvršenja. Uporediti ova rešenja za razlicite vrednosti dimenizija vektora.*/
+
+#define n 12
+
+int main()
+{
+	double start, end, final_result;
+	int i, sum, final_sum, a[n];
+	final_sum = 0;
+
+	for (i = 0; i < n; i++)
+	{
+		a[i] = rand() % 9;
+	}
+	// printf("\nVektor A\n");
+	// for (i = 0; i < n; i++)
+	// {
+	// 	printf("%d ", a[i]);
+	// }
+	// printf("\n");
+
+	// int broj_niti = omp_get_num_procs();
+	// printf("Broj jezgara u sistemu je %d \n", broj_niti);
+
+	// omp_set_num_threads(broj_niti);
+	// start = omp_get_wtime();
+	// SA REDUKCIJOM
+#pragma omp parallel for reduction(+ : final_sum)  
+	for (i = 0; i < n; i++)
+	{
+		final_sum += a[i];
+	}
+	
+	final_result = final_sum / (float)n;
+
+	// end = omp_get_wtime();
+	// printf("\nProsecna vrednost vektora A SA REDUKCIJOM je %f, i ovo je izracunato za %f sec\n", final_result, (end - start));
+
+	// BEZ REDUKCIJE
+	//start = omp_get_wtime();
+	sum = 0;
+	final_sum = 0;
+#pragma omp parallel firstprivate(sum)
+	{
+#pragma omp for
+		for (i = 0; i < n; i++)
+		{
+			sum += a[i];
+		}
+
+#pragma omp critical(sumOfVectorElements)
+		{
+			final_sum += sum;
+		}
+	}
+	final_result = final_sum / (float)n;
+	//end = omp_get_wtime();
+	//printf("\nProsecna vrednost vektora A BEZ REDUKCIJE je %f, i ovo je izracunato za %f sec\n", final_result, (end - start));
+}
+
+//------------------------------------------- Zadatak 5 ------------------------------
+// OpenMP.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+
+#include <iostream>
+#include "omp.h"
+#include "math.h"
+#include <cstdio>
+#include <ctime>
+
+/*5. Napisati OpenMP program kojim se generiše maksimalna vrednost elemanata vektora,
+podelom iteracija petlje izmeu razlicitih niti korišcenjem direktive critical za kombinovanje
+parcijalnih rezultata u nitima. Uporediti vremena izvršenja u oba slucaja sa sekvencijalnim
+vremenom izvršenja. Uporediti ova rešenja za razlicite vrednosti dimenizija vektora.*/
+
+#define n 12
+
+int main()
+{
+	// Ne mogu da uporedjujem vremena -_-
+	double start, end;
+	int maxElem, a[n], tmp_max,maxElem, i;
+	// int broj_niti = omp_get_num_procs();
+	// omp_set_num_threads(broj_niti);
+	// printf("Broj niti je setovan na %d\n", broj_niti);
+
+	//printf("Vektor A \n");
+	for (int j = 0; j < n; j++)
+	{
+		a[j] = rand() % 100;
+		//printf("%d ", a[j]);
+	}
+	//printf("\n");
+
+	maxElem = INT_MIN;
+
+#pragma omp for reduction(max:maxElem)
+		for (i = 0; i < n; i++)
+		{
+			if (a[i] > tmp_max)
+			{
+				maxElem = a[i];
+			}
+		}
+
+
+	tmp_max = INT_MIN;
+	maxElem = INT_MIN;
+#pragma omp parallel firstprivate(tmp_max)
+	{
+
+#pragma omp for 
+		for (i = 0; i < n; i++)
+		{
+			if (a[i] > tmp_max)
+			{
+				tmp_max = a[i];
+			}
+		}
+
+#pragma omp critical(maxElement)
+		{
+			if (maxElem < tmp_max)
+			{
+				maxElem = tmp_max;
+			}
+		}
+	}
+	//printf("Maksimalni element niza je %d\n", max);
+}
+
+//------------------------------------------- Zadatak 6 ------------------------------
+
+// OpenMP.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+
+#include <iostream>
+#include "omp.h"
+#include "math.h"
+#include <cstdio>
+#include <ctime>
+
+/*6. Napisati OpenMP kod koji sadrži sledecu petlju:
+for (i=0;i<m;i++)
+for (j=0;j<n;j++)
+a[i][j]=2*a[i-1][j];
+i izvršiti njenu paralelizaciju. Prouciti da li postoje zavisnosti izmeu iteracija i po kom indeksu
+je moguca paralelizacija. Ispitati da li zamena petlji uzrokuje promenu u performansama.*/
+
+#define N 6
+#define M 6
+
+int main()
+{
+	int A_seq[M][N], A_parallel[M][N];
+
+	//printf("Elementi matrice A:\n");
+	for (int i = 0; i < M; i++)
+	{
+		for (int j = 0; j < N; j++)
+		{
+			A_seq[i][j] = rand() % 10;
+			A_parallel[i][j] = A_seq[i][j];
+			//printf("%d \t", A_seq[i][j]);
+		}
+		//printf("\n");
+	}
+	//printf("\n");
+
+	//double start = omp_get_wtime();
+	for (int i = 1; i < M; i++)
+	{
+		for (int j = 0; j < N; j++)
+		{
+			A_seq[i][j] = 2 * A_seq[i - 1][j];
+		}
+	}
+	//double stop = omp_get_wtime();
+	//double time_of_execution = stop - start;
+
+	// printf("Elementi transformisane matrice A:\n");
+	// for (int i = 0; i < M; i++)
+	// {
+	// 	for (int j = 0; j < N; j++)
+	// 	{
+	// 		printf("%d \t", A_seq[i][j]);
+	// 	}
+	// 	printf("\n");
+	// }
+	// printf("\n");
+	// printf("Vreme izvrsenja sekvencijalnog programa je: %lf ms. \n", time_of_execution);
+
+	//int num_of_proc = omp_get_num_procs();
+	int j;
+
+	//start = omp_get_wtime();
+#pragma omp parallel 
+	{
+#pragma omp for
+		for (j = 0; j < N; j++)
+		{
+			for (int i = 1; i < M; i++)
+				A_parallel[i][j] = 2 * A_parallel[i - 1][j];
+		}
+	}
+	//stop = omp_get_wtime();
+	//time_of_execution = stop - start;
+
+	// printf("Elementi transformisane matrice A:\n");
+	// for (int i = 0; i < M; i++)
+	// {
+	// 	for (int j = 0; j < N; j++)
+	// 	{
+	// 		printf("%d \t", A_parallel[i][j]);
+	// 	}
+	// 	printf("\n");
+	// }
+	// printf("\n");
+	// printf("Vreme izvrsenja paralelnog programa je: %lf ms. \n", time_of_execution);
+}

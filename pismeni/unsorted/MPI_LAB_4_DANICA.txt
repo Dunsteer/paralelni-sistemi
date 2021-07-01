@@ -1,0 +1,355 @@
+------------------------------------ Zadatak 1 --------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define N 4
+
+int main(int argc, char* argv[])
+{
+	/*Napisati MPI program koji kreira komunikator koji se sastoji od dijagonalnih procesa u
+	kvadratnoj mrezi procesa. Iz master procesa novog komunikatora poslati poruku svim ostalim procesima.
+	Svaki proces novog komunikatora treba da prikaže primljenu poruku, identifikator procesa u novom komunikatoru
+	i stari identifikator procesa.*/
+
+	int rank, row, column;
+	MPI_Comm digonal;
+
+	int new_rank;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	// matrica je NxN, sto znaci da je ukupan broj procesa kad pokrecemo program 16
+	row = rank / N;
+	column = rank % N;
+
+	int color = 0;
+	// procesi na dijagonali imaju color = 1
+	if (row == column)
+		color = 1;
+
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	// Novi komunikator koji se sastoji od procesa sa color = 1
+	MPI_Comm_split(MPI_COMM_WORLD, color, 0, &digonal);
+	MPI_Comm_rank(digonal, &new_rank);
+
+	char message[13];
+	if (new_rank == 0) {
+		message[0] = 'J';
+		message[1] = 'a';
+		message[2] = ' ';
+		message[3] = 's';
+		message[4] = 'a';
+		message[5] = 'm';
+		message[6] = ' ';
+		message[7] = 'm';
+		message[8] = 'a';
+		message[9] = 's';
+		message[10] = 't';
+		message[11] = 'e';
+		message[12] = 'r';
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	MPI_Bcast(message, 13, MPI_CHAR, 0, digonal);
+
+	if (color == 1)
+		printf("Proces sa starim rankom %d i novim rankom %d je dobio poruku: %s \n", rank, new_rank, message);
+
+
+	MPI_Finalize();
+
+}
+
+
+------------------------------------ Zadatak 2 --------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define N 4
+#define M 3
+
+int main(int argc, char* argv[])
+{
+	/*Napisati MPI program kojim se kreira dvodimenzionalna Cartesian struktura sa n vrsta i m kolona.
+	U svakom od nxm procesa odštampati identifikatore procesa njegovog levog i desnog suseda na udaljenosti 2.
+	Smatrati da su procesi u prvoj i poslednjoj koloni jedne vrste susedni.*/
+
+	int rank, row, column;
+	MPI_Comm cartesian;
+	int dims[2] = { N, M };
+	int periods[2] = { 0,1 };
+	int coords[2];
+	int new_rank;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, &cartesian);
+	MPI_Cart_coords(cartesian, rank, 2, coords);
+
+	MPI_Cart_rank(cartesian, coords, &new_rank);
+
+	int left, right;
+	// levi sused > 0, po dim 1 se vrsi sift (po kolonama) (dim 0 - vrste)
+	MPI_Cart_shift(cartesian, 1, 1, &left, &right);
+	MPI_Cart_shift(cartesian, 1, 1, &left, &right);
+
+	printf("Proces sa rankom %d komunicira sa svojim levim susedom na rastojanju dva %d \n", rank, left);
+
+	printf("Proces sa rankom %d komunicira sa svojim desnim susedom na rastojanju dva %d \n", rank, right);
+
+	MPI_Finalize();
+
+}
+
+
+
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define N 4
+#define M 3
+
+int main(int argc, char* argv[])
+{
+	/*Napisati MPI program kojim se kreira dvodimenzionalna Cartesian struktura sa n vrsta i m kolona.
+	U svakom od nxm procesa odštampati identifikatore procesa njegovog levog i desnog suseda na udaljenosti 2.
+	Smatrati da su procesi u prvoj i poslednjoj koloni jedne vrste susedni.*/
+
+	int rank, row, column;
+	MPI_Comm cartesian;
+	int dims[2] = { N, M };
+	int periods[2] = { 0,1 };
+	int coords[2];
+	int new_rank;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, &cartesian);
+	MPI_Cart_coords(cartesian, rank, 2, coords);
+
+	MPI_Cart_rank(cartesian, coords, &new_rank);
+
+	int left, right;
+	MPI_Cart_shift(cartesian, 0, 2, &left, &right);
+
+	printf("Proces sa rankom %d komunicira sa svojim levim susedom na rastojanju dva %d \n", rank, left);
+
+	printf("Proces sa rankom %d komunicira sa svojim desnim susedom na rastojanju dva %d \n", rank, right);
+
+	MPI_Finalize();
+
+}
+
+
+------------------------------------ Zadatak 3 --------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 4
+
+int main(int argc, char* argv[])
+{
+	/*Napisati MPI program koji kreira komunikator comm1 koji se sastoji od svih procesa sa identifikatorima
+	deljivim sa 3. Master proces (P0) svim procesima ove grupe šalje po jednu vrstu matrice A. Odštampati identifikatore
+	procesa koji pripadaju comm1 i čija je suma elemenata primljene vrste matrice A manja od zadate vrednosti v.*/
+
+	int rank, color = 0;
+	MPI_Comm comm1;
+	int v = 30;
+	int new_rank;
+	int a[n][n], local_a[n];
+	int local_sum = 0;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	if (rank % 3 == 0) {
+		color = 1;
+	}
+
+	MPI_Comm_split(MPI_COMM_WORLD, color, 0, &comm1);
+	MPI_Comm_rank(comm1, &new_rank);
+	MPI_Barrier(comm1);
+	if (new_rank == 0) {
+		printf("Matrica A u procesu sa rankom 0 \n");
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				a[i][j] = rand() % 10;
+				printf("%d ", a[i][j]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+	MPI_Scatter(a, n, MPI_INT, local_a, n, MPI_INT, 0, comm1);
+	if (color == 1) {
+		for (int i = 0; i < n; i++) {
+			local_sum += local_a[i];
+		}
+		if (local_sum < v) {
+			printf("Proces sa starim rankom %d i novim rankom %d prima vrstu cija je lokalna suma MANJA od V %d: ", rank, new_rank, local_sum);
+			for (int i = 0; i < n; i++) {
+				printf("%d ", local_a[i]);
+			}
+			printf("\n");
+		}
+		else {
+			if (local_sum < v) {
+				printf("Proces sa starim rankom %d i novim rankom %d prima vrstu cija je lokalna suma VECA od V %d: ", rank, new_rank, local_sum);
+				for (int i = 0; i < n; i++) {
+					printf("%d ", local_a[i]);
+				}
+				printf("\n");
+			}
+		}
+	}
+
+
+	MPI_Finalize();
+
+}
+
+
+------------------------------------ Zadatak 4 --------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 4
+#define m 3
+
+int main(int argc, char* argv[])
+{
+	/*Napisati MPI program kojim se kreira dvodimenzionalna Cartesian struktura sa n vrsta i m kolona.
+	Svaki od nxm procesa izračunava sumu identifikatora njegovog gornjeg i donjeg suseda. Obezbediti
+	da se u master procesu na kraju programa nađe ukupna izračunata suma.*/
+
+	int rank, new_rank, up, down,final_sum;
+	int dims[2] = { n,m };
+	int periods[2] = { 1,0 };
+	MPI_Comm cartesian;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &cartesian);
+
+
+	int sum = 0;
+	MPI_Cart_shift(cartesian, 0, 1, &up, &down);
+	sum += up + down;
+
+	printf("Moj rank je %d, moj gornji sused je %d, a donji je %d, suma njihova je %d \n", rank, up,down,sum);
+	MPI_Reduce(&sum, &final_sum, 1, MPI_INT, MPI_SUM, 0, cartesian);
+	if (rank == 0) {
+		printf("Moj rank je %d i finalna suma je %d \n", rank, final_sum);
+	}
+
+	MPI_Finalize();
+
+}
+
+
+------------------------------------ Zadatak 5 --------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 4
+
+int main(int argc, char* argv[])
+{
+	/*Napisati MPI program kojim se kreira dvodimenzionalna Cartesian struktura sa n vrsta i n kolona.
+	Podeliti procese u grupe koje odgovaraju gornjoj i donjoj trougaonoj matrici kreirane strukture.
+	Procese na dijagonali proizvoljno dodeliti jednoj od grupa. U okviru svake grupe sumirati vrednosti
+	identifikatora svih procesa koji pripadaju datoj grupi. Master procesu komunikatora MPI_COMM_WORLD
+	dostaviti ove vrednosti i odštampati ih.*/
+
+	int rank, row, column, local_sum, final_sum=0;
+	MPI_Comm cartesian, above_diag;
+	int dims[2] = { n, n };
+	int periods[2] = { 0,0 };
+	int coords[2];
+	int new_rank, color = 0;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &cartesian);
+	MPI_Cart_coords(cartesian, rank, 2, coords);
+
+	if (coords[0] < coords[1]) {
+		color = 1;
+	}
+
+	MPI_Comm_split(MPI_COMM_WORLD, color, 0, &above_diag);
+	MPI_Comm_rank(above_diag, &new_rank);
+
+
+	printf("Proces sa rankom %d ima koordinate u matrici %d, %d i novi rank mu je %d i color mu je %d \n", rank, coords[0], coords[1], new_rank, color);
+	local_sum = new_rank;
+
+
+	MPI_Reduce(&local_sum, &final_sum, 1, MPI_INT, MPI_SUM, 0, above_diag);
+
+	if (new_rank == 0 && color == 1)
+	{
+		printf("Suma rankova procesa iznad dijagonale je %d. \n", final_sum);
+	}
+	else if (new_rank == 0 && color == 0)
+	{
+		printf("Suma rankova procesa ispod dijagonale je %d. \n", final_sum);
+	}
+
+	MPI_Finalize();
+
+}
+------------------------------------ Zadatak 6 --------------------------------------
+#include <iostream>
+#include "mpi.h"
+#include "math.h"
+#define n 4
+#define m 3
+
+int main(int argc, char* argv[])
+{
+	/*Napisati MPI program kojim se kreira dvodimenzionalna Cartesian struktura sa n vrsta i m kolona.
+	Za svaki skup procesa koji pripadaju istoj koloni strukture kreirati novi komunikator. Master procesu
+	iz svake kolone poslati koordinate procesa sa najvećim identifikatorom i prikazati ih.*/
+
+	int rank, row, column, local_max, final_max = INT_MIN;
+	MPI_Comm cartesian, colums;
+	int dims[2] = { n, m };
+	int periods[2] = { 0,0 };
+	int coords[2];
+	int new_rank, color = 0;
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 0, &cartesian);
+	MPI_Cart_coords(cartesian, rank, 2, coords);
+
+	color = coords[1] % m;
+
+	MPI_Comm_split(MPI_COMM_WORLD, color, 0, &colums);
+	MPI_Comm_rank(colums, &new_rank);
+
+
+	printf("Proces sa rankom %d ima koordinate u matrici %d, %d i novi rank mu je %d i color mu je %d \n", rank, coords[0], coords[1], new_rank, color);
+	// nije mi logicno da local_mac bude jednak new rank, jer je onda max uvek n-1
+	local_max = rank;
+
+	MPI_Reduce(&local_max, &final_max, 1, MPI_INT, MPI_MAX, 0, colums);
+
+	if (new_rank == 0)
+	{
+		printf("Maksimalni identifikator za kolonu %d je %d  \n", color, final_max);
+	}
+
+	MPI_Finalize();
+
+}

@@ -5,8 +5,7 @@
 #define N 6
 #define K 2
 
-
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     int rank, A[N][N], B[N][N], myRows[K][N], myCols[N][K], myRes[K][K], C[N][N];
     MPI_Init(&argc, &argv);
@@ -42,7 +41,7 @@ int main(int argc, char* argv[])
     MPI_Datatype rows, cols, cols_recv;
     MPI_Type_vector(K, N, N, MPI_INT, &rows);
     MPI_Type_commit(&rows);
-    
+
     MPI_Type_vector(N, K, N, MPI_INT, &cols);
     MPI_Type_commit(&cols);
 
@@ -57,13 +56,11 @@ int main(int argc, char* argv[])
             }
         }
     }
-
     else
     {
         MPI_Recv(myRows, 1, rows, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         MPI_Recv(myCols, N * K, MPI_INT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
-
 
     printf("Process %d. My rows:\n", rank);
     for (int i = 0; i < K; i++)
@@ -83,7 +80,7 @@ int main(int argc, char* argv[])
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    if(rank != 0)
+    if (rank != 0)
     {
         for (int i = 0; i < K; i++)
         {
@@ -131,4 +128,3 @@ int main(int argc, char* argv[])
 
     MPI_Finalize();
 }
-

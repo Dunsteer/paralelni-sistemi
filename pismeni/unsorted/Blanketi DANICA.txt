@@ -1,0 +1,525 @@
+//---------------------------------------------------22.4.2018. ------------------------------------------------------------
+
+#ifdef __CUDACC__
+#define cuda_SYNCTHREADS() __syncthreads()
+#else
+#define cuda_SYNCTHREADS()
+#endif
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <cuda.h>
+#include <device_functions.h>
+#include <cuda_runtime_api.h>
+
+#include <stdio.h>
+#include "math.h"
+#include "stdlib.h"
+
+// 22.4.2018.
+
+#define N 5
+#define THREADS 4
+
+__global__ void
+kernel(int *a, int p, int q, int *b, int index)
+{
+	__shared__ int local_sums[THREADS];
+	int tid = threadIdx.x;
+	int broj_elemenata_matrice = N * N;
+	int slice = broj_elemenata_matrice / THREADS;
+	int start = slice * tid;
+	int end = start + slice;
+	if (tid == THREADS - 1)
+		end += broj_elemenata_matrice % THREADS;
+	int local_sum = 0;
+	for (int i = start; i < end; i++)
+	{
+		if (a[i] < p)
+		{
+			a[i] = q;
+		}
+		local_sum += a[i];
+	}
+	local_sums[tid] = local_sum;
+	__syncthreads();
+	int half = THREADS;
+	do
+	{
+		__syncthreads();
+		half /= 2;
+		if (tid < half)
+		{
+			local_sums[tid] += local_sums[tid + half];
+		}
+	} while (half != 1);
+	if (tid == 0)
+	{
+		b[index] = local_sums[0];
+	}
+}
+
+int main()
+{
+	int ha[N][N];
+	int *db, hb[N];
+	int *dc, hc[N];
+	int p = 5;
+	int q = 0;
+
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+			ha[i][j] = rand() % 10;
+	}
+	printf("MATRICA A \n");
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+			printf(" %d ", ha[i][j]);
+		printf("\n");
+	}
+	printf("\n");
+
+	cudaMalloc((void **)&db, sizeof(int) * N);
+	cudaMalloc((void **)&dc, sizeof(int) * N);
+
+	for (int i = 0; i < N; i++)
+	{
+		printf("\n %d. VRSTA", i + 1);
+		for (int j = 0; j < N; j++)
+		{
+			hc[j] = ha[i][j];
+			printf(" %d ", hc[j]);
+		}
+		cudaMemcpy(dc, hc, sizeof(int) * N, cudaMemcpyHostToDevice);
+		cudaMemcpy(db, hb, sizeof(int) * N, cudaMemcpyHostToDevice);
+		kernel<<<1, THREADS>>>(dc, p, q, db, i);
+		cudaMemcpy(hb, db, sizeof(int) * N, cudaMemcpyDeviceToHost);
+		cudaMemcpy(hc, dc, sizeof(int) * N, cudaMemcpyDeviceToHost);
+		for (int j = 0; j < N; j++)
+		{
+			ha[i][j] = hc[j];
+		}
+		printf("\n");
+	}
+
+	printf("\n\n MATRICA A \n");
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+			printf(" %d ", ha[i][j]);
+		printf("\n");
+	}
+	printf("\n");
+
+	printf("\n NIZ B  \n");
+	for (int i = 0; i < N; i++)
+		printf("%d ", hb[i]);
+	printf("\n");
+
+	cudaFree(db);
+	cudaFree(dc);
+
+	return 0;
+}
+
+//---------------------------------------------------24.1.2019. ------------------------------------------------------------
+#ifdef __CUDACC__
+#define cuda_SYNCTHREADS() __syncthreads()
+#else
+#define cuda_SYNCTHREADS()
+#endif
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <cuda.h>
+#include <device_functions.h>
+#include <cuda_runtime_api.h>
+
+#include <stdio.h>
+#include "math.h"
+#include "stdlib.h"
+
+// 24.1.2019.
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#include "math.h"
+
+#define N 5
+#define BLOCKS 4
+#define THREADS 3
+
+__global__ void
+kernel(float *a, float *b)
+{
+	__shared__ int sa[THREADS + 2];
+	int tid = blockDim.x * blockIdx.x + threadIdx.x;
+	// svaka nit je zaduzena sa jedan element, indeksiranje sa niza je po threadIdx.x jer je deljiva memorija
+	// vidljiva samo u okviru jednog bloka
+	sa[threadIdx.x] = a[tid];
+	// zadnja nit svakog bloka ucitava i sledeca dva elementa
+	if (tid == THREADS - 1)
+	{
+		sa[threadIdx.x + 1] = a[tid + 1];
+		sa[threadIdx.x + 2] = a[tid + 2];
+	}
+	__syncthreads();
+	b[tid] = (3 * sa[threadIdx.x] + 10 * sa[threadIdx.x + 1] + 7 * sa[threadIdx.x + 2]) / 20.f;
+}
+
+int main()
+{
+	float *da, *ha, *hb, *db;
+	ha = new float[N + 2];
+	hb = new float[N];
+
+	cudaMalloc((void **)&da, sizeof(float) * (N + 2));
+	cudaMalloc((void **)&db, sizeof(float) * N);
+
+	for (int i = 0; i < N + 2; i++)
+	{
+		ha[i] = rand() % 10;
+	}
+	printf("Niz A \n");
+	for (int i = 0; i < N + 2; i++)
+		printf("%f ", ha[i]);
+	printf("\n");
+
+	cudaMemcpy(da, ha, sizeof(float) * (N + 2), cudaMemcpyHostToDevice);
+	kernel<<<BLOCKS, THREADS>>>(da, db);
+	cudaMemcpy(hb, db, sizeof(float) * N, cudaMemcpyDeviceToHost);
+	printf("Niz B \n");
+	for (int i = 0; i < N; i++)
+		printf("%f ", hb[i]);
+	printf("\n");
+
+	return 1;
+}
+//---------------------------------------------------13.6.2018. ------------------------------------------------------------
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <cuda.h>
+#include <device_functions.h>
+#include <cuda_runtime_api.h>
+
+#include <stdio.h>
+#include "math.h"
+#include "stdlib.h"
+
+// 13.6.2018.
+
+#define N 5
+#define THREADS 4
+#define BLOCKS 3
+
+__global__ void
+kernel(float *r, float *g, float *b, float *i)
+{
+	int tid = threadIdx.x + blockDim.x * blockIdx.x;
+	int broj_elemenata_matrice = N * N;
+	while (tid < broj_elemenata_matrice)
+	{
+		i[tid] = 0.299 * r[tid] + 0.589 * g[tid] + 0.114 * b[tid];
+		tid += blockDim.x * BLOCKS;
+	}
+}
+
+int main()
+{
+	float hr[N][N], hg[N][N], hb[N][N], hi[N][N];
+	float *db, *dr, *dg, *di;
+
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+		{
+			hr[i][j] = rand() % 10;
+			hg[i][j] = rand() % 10;
+			hb[i][j] = rand() % 10;
+		}
+	}
+	printf("MATRICA RED \n");
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+			printf(" %f ", hr[i][j]);
+		printf("\n");
+	}
+	printf("\n");
+	printf("MATRICA GREEN \n");
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+			printf(" %f ", hg[i][j]);
+		printf("\n");
+	}
+	printf("\n");
+	printf("MATRICA BLUE \n");
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+			printf(" %f ", hb[i][j]);
+		printf("\n");
+	}
+	printf("\n");
+
+	cudaMalloc((void **)&db, sizeof(float) * N * N);
+	cudaMalloc((void **)&dr, sizeof(float) * N * N);
+	cudaMalloc((void **)&dg, sizeof(float) * N * N);
+	cudaMalloc((void **)&di, sizeof(float) * N * N);
+
+	cudaMemcpy(dr, hr, sizeof(float) * N * N, cudaMemcpyHostToDevice);
+	cudaMemcpy(db, hb, sizeof(float) * N * N, cudaMemcpyHostToDevice);
+	cudaMemcpy(dg, hg, sizeof(float) * N * N, cudaMemcpyHostToDevice);
+
+	kernel<<<BLOCKS, THREADS>>>(dr, dg, db, di);
+
+	cudaMemcpy(hi, di, sizeof(int) * N * N, cudaMemcpyDeviceToHost);
+
+	printf("\n\n MATRICA I \n");
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+			printf(" %f ", hi[i][j]);
+		printf("\n");
+	}
+	printf("\n");
+
+	cudaFree(db);
+	cudaFree(dr);
+	cudaFree(di);
+	cudaFree(dg);
+
+	return 0;
+}
+//---------------------------------------------------26.3.2019. ------------------------------------------------------------
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <cuda.h>
+#include <device_functions.h>
+#include <cuda_runtime_api.h>
+
+#include <stdio.h>
+#include "math.h"
+#include "stdlib.h"
+
+// 26.3.2019.
+
+#define N 5
+#define M 5
+#define THREADS 4
+#define BLOCKS 3
+
+__global__ void
+kernel(int *a, int *poz, int *neg)
+{
+	int tid = threadIdx.x;
+	__shared__ int local_pozs[THREADS];
+	int broj_elemenata_matrice = N * M;
+	int slice = broj_elemenata_matrice / THREADS;
+	int start = slice * tid;
+	int end = start + slice;
+	int local_poz = 0;
+	if (tid == THREADS - 1)
+	{
+		end += broj_elemenata_matrice % THREADS;
+	}
+
+	for (int i = start; i < end; i++)
+	{
+		a[i] = -a[i];
+		if (a[i] >= 0)
+		{
+			local_poz += 1;
+		}
+	}
+	local_pozs[tid] = local_poz;
+	__syncthreads();
+	int half = THREADS;
+	do
+	{
+		__syncthreads();
+		half /= 2;
+		if (tid < half)
+		{
+			local_pozs[tid] += local_pozs[tid + half];
+		}
+	} while (half != 1);
+	if (tid == 0)
+	{
+		*poz = local_pozs[0];
+		*neg = broj_elemenata_matrice - local_pozs[0];
+	}
+}
+
+int main()
+{
+	int ha[N][M];
+	int *da;
+	int hpoz, hneg, *dpoz, *dneg;
+
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < M; j++)
+		{
+			ha[i][j] = rand() % 10 - 5;
+		}
+	}
+	printf("MATRICA A \n");
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < M; j++)
+			printf(" %d ", ha[i][j]);
+		printf("\n");
+	}
+	printf("\n");
+
+	cudaMalloc((void **)&da, sizeof(int) * N * M);
+	cudaMalloc((void **)&dpoz, sizeof(int));
+	cudaMalloc((void **)&dneg, sizeof(int));
+
+	cudaMemcpy(da, ha, sizeof(int) * N * M, cudaMemcpyHostToDevice);
+
+	kernel<<<1, THREADS>>>(da, dpoz, dneg);
+
+	cudaMemcpy(&hneg, dneg, sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(&hpoz, dpoz, sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(ha, da, sizeof(int) * N * M, cudaMemcpyDeviceToHost);
+
+	printf("\n\n Broj pozitivnih elemenata %d, a broj negativnih elemenata %d \n", hpoz, hneg);
+
+	printf("MATRICA A \n");
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < M; j++)
+			printf(" %d ", ha[i][j]);
+		printf("\n");
+	}
+	printf("\n");
+
+	cudaFree(da);
+	cudaFree(dneg);
+	cudaFree(dpoz);
+
+	return 0;
+}
+
+//---------------------------------------------------22.4.2018. ------------------------------------------------------------
+
+#include <stdio.h>
+#include "math.h"
+#include "stdlib.h"
+
+#define N 16
+#define THREADS 4
+#define BLOCKS 4
+
+__global void kernel(int *niz, int *counts)
+{
+	int tid = blockDim.x * blockIdx.x + threadIdx.x;
+	__shared__ int b[THREADS];
+	b[threadIdx.x] = -niz[tid];
+	__syncthreads();
+
+	if (b[threadIdx.x] < 0)
+		atomicAdd(&counts[0], 1);
+	else
+		atomicAdd(&counts[1], 1);
+
+	niz[tid] = b[threadIdx.x];
+	__syncthreads();
+}
+
+int main()
+{
+	int hostNiz[N];
+	int *deviceNiz;
+	int counts[2];
+	int *deviceCounts;
+
+	for (int i = 0; i < N; i++)
+	{
+		hostNiz[i] = rand() % 10;
+	}
+
+	counts[0] = 0;
+	counts[1] = 0;
+
+	cudaMalloc((void **)&deviceNiz, sizeof(int) * N);
+	cudaMalloc((void **)&deviceCounts, sizeof(int) * 2);
+
+	cudaMemcpy(deviceNiz, hostNiz, sizeof(int) * N, cudaMemcpyHostToDevice);
+	cudaMemcpy(deviceCounts, counts, sizeof(int) * N, cudaMemcpyHostToDevice);
+
+	kernel<<<1, THREADS>>>(hostNiz, counts);
+
+	cudaMemcpy(hostNiz, deviceNiz, sizeof(int) * N, cudaMemcpyDeviceToHost);
+	cudaMemcpy(counts, deviceCounts, sizeof(int) * 2, cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < N; i++)
+		printf(" %d ", hostNiz[i]);
+	printf("\n");
+
+	printf("\n\n Broj pozitivnih elemenata %d, a broj negativnih elemenata %d \n", counts[0], counts[1]);
+
+	cudaFree(deviceNiz);
+	cudaFree(deviceCounts);
+
+	return 0;
+}
+
+//---------------------------------------------------24.4.2021. ------------------------------------------------------------
+
+#include <stdio.h>
+#include "math.h"
+#include "stdlib.h"
+
+#define N 5
+#define THREADS N - 2
+#define BLOCKS N - 2
+
+__global void kernel(int *niz, int *out)
+{
+	int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+	out[tid] = (niz[tid] + niz[tid + 2] + niz[tid + N * 2] + niz[n * 2 + 2]) / 4;
+}
+
+int main()
+{
+	int A[N][N];
+	int B[N - 2][N - 2];
+	int *da, *db;
+
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++)
+		{
+			A[i][j] = rand() % 10;
+		}
+	}
+
+	cudaMalloc((void **)&da, sizeof(int) * N * N);
+	cudaMalloc((void **)&db, sizeof(int) * (N - 2) * (N - 2));
+
+	cudaMemcpy(da, A, sizeof(int) * N, cudaMemcpyHostToDevice);
+
+	kernel<<<BLOCKS, THREADS>>>(da, db);
+
+	cudaMemcpy(B, db, sizeof(int) * N, cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < N - 2; i++)
+	{
+		for (int j = 0; j < N - 2; j++)
+		{
+			printf("%d".B[i][j]);
+		}
+	}
+
+	cudaFree(da);
+	cudaFree(db);
+
+	return 0;
+}

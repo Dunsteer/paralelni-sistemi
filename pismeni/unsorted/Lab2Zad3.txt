@@ -1,0 +1,189 @@
+#ifdef __CUDACC__
+#define cuda_SYNCTHREADS() __syncthreads()
+#else
+#define cuda_SYNCTHREADS()
+#endif
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <cuda.h>
+#include <device_functions.h>
+#include <cuda_runtime_api.h>
+
+#include <stdio.h>
+#include"math.h"
+#include"stdlib.h"
+
+#define n 4
+#define THREADS 2
+
+
+__global__ void kernel(int* a, int* sum) {
+	int tid = threadIdx.x;
+	__shared__ int local_sums[THREADS];
+	int slice = n / THREADS;
+	int tmp_sum = 0;
+	int start = tid * slice;
+	int end = start + slice;
+	if (tid == THREADS - 1) {
+		end += n % THREADS;
+	}
+	for (int i = start; i < end; i++)
+	{
+		int tmp = a[n* blockIdx.x + i];
+		tmp_sum += tmp;
+	}
+	local_sums[tid] = tmp_sum;
+	cuda_SYNCTHREADS();
+
+	int half = THREADS;
+	do {
+		cuda_SYNCTHREADS();
+		half /= 2;
+		if (tid < half) {
+				local_sums[tid] += local_sums[tid + half];
+		}
+	} while (half != 1);
+	if (tid == 0) {
+		sum[blockIdx.x] = local_sums[0];
+	}
+}
+
+int main() {
+	int ha[n*n];
+	int hsum[n];
+	int *db;
+	int *dsum;
+
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++)
+			ha[i*n + j] = rand() % 3;
+	}
+	printf("MATRICA A \n");
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++)
+			printf(" %d ", ha[i*n + j]);
+		printf("\n");
+	}
+	printf("\n");
+
+	cudaMalloc((void**)&db, sizeof(int)*n*n);
+	cudaMalloc((void**)&dsum, sizeof(int)*n);
+
+	cudaMemcpy(dsum, hsum, sizeof(int)*n, cudaMemcpyHostToDevice);
+	cudaMemcpy(db, ha, sizeof(int)*n*n, cudaMemcpyHostToDevice);
+	kernel << <n, THREADS >> > (db, dsum);
+	cudaMemcpy(hsum, dsum, sizeof(int)*n, cudaMemcpyDeviceToHost);
+	printf("\n");
+
+	printf("VEKTOR B: \n");
+	for (int i = 0; i < n; i++)
+		printf("%d ", hsum[i]);
+	printf("\n");
+
+	cudaFree(db);
+	cudaFree(dsum);
+
+	return 0;
+}
+
+
+/*
+3. Koristeći CUDA tehnologiju, sastaviti program koji na osnovu matrice Anxn kreira vektor Bn,
+ gde je element B[i] jednak sumi elemenata i-te vrste matrice A. Maksimalno redukovati broj 
+pristupa globalnoj memoriji. Obratiti pažnju na efikasnost paralelizacije. Omogućiti rad 
+programa za matrice proizvoljne veličine.
+*/
+
+
+#ifdef __CUDACC__
+#define cuda_SYNCTHREADS() __syncthreads()
+#else
+#define cuda_SYNCTHREADS()
+#endif
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <cuda.h>
+#include <device_functions.h>
+#include <cuda_runtime_api.h>
+
+#include <stdio.h>
+#include"math.h"
+#include"stdlib.h"
+
+#define N 5
+#define THREADS 4
+
+
+__global__ void kernel(int* a, int* b, int indexNizaB) {
+	int tid = threadIdx.x;
+	__shared__ int local_sums[THREADS];
+	int slice = N / THREADS;
+	int local_sum = 0;
+	int start = tid*slice;
+	int end = start + slice;
+	if (tid == THREADS - 1) {
+		end += N % THREADS;
+	}
+	for (int i = start; i < end; i++)
+		local_sum += a[i];
+	local_sums[tid] = local_sum;
+	cuda_SYNCTHREADS();
+	int half = THREADS;
+	do {
+		cuda_SYNCTHREADS();
+		half /= 2;
+		if (tid < half)
+			local_sums[tid] += local_sums[tid + half];
+	} while (half != 1);
+	if (tid == 0) {
+		b[indexNizaB] = local_sums[0];
+	}
+}
+
+int main() {
+	int ha[N][N];
+	int *db, hb[N];
+	int *dc, hc[N];
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+			ha[i][j] = rand() % 10;
+	}
+	printf("MATRICA A \n");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+			printf(" %d ", ha[i][j]);
+		printf("\n");
+	}
+	printf("\n");
+
+	cudaMalloc((void**)&db, sizeof(int)*N);
+	cudaMalloc((void**)&dc, sizeof(int)*N);
+
+	for (int i = 0; i < N; i++) {
+		printf("\n %d. VRSTA", i + 1);
+		for (int j = 0; j < N; j++) {
+			hc[j] = ha[i][j];
+			printf(" %d ", hc[j]);
+		}
+		cudaMemcpy(dc, hc, sizeof(int)*N, cudaMemcpyHostToDevice);
+		cudaMemcpy(db, hb, sizeof(int)*N, cudaMemcpyHostToDevice);
+		kernel << <1, THREADS >> > (dc, db, i);
+		cudaMemcpy(hb, db, sizeof(int)*N, cudaMemcpyDeviceToHost);
+		printf("\n");
+
+	}
+
+	printf("\n NIZ B  \n");
+	for (int i = 0; i < N; i++)
+		printf("%d ", hb[i]);
+	printf("\n");
+
+	cudaFree(db);
+	cudaFree(dc);
+
+	return 0;
+}
+
+
+

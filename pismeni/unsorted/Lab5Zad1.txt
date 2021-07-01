@@ -1,0 +1,102 @@
+// OpenMP.cpp : This file contains the 'main' function. Program execution begins and ends there.
+//
+
+#include <iostream>
+#include "omp.h"
+#include "math.h"
+#include <cstdio>
+#include <ctime>
+
+/*1. Napisati sekvencijalni program kojim se vrši množenje dve matrice A i B reda N.
+Korišcenjem OpenMP direktive izvršiti paralelizaciju petlje, tako da se izvrši distribucija
+iteracija izmeu niti.
+Podesiti broj niti tako da bude jednak broju jezgara racunara. Izmeriti vreme množenja matrica
+za sekvencijalni slucaj i za slucaj posle uvoenja openMP direktiva. Uporediti oba rešenja za
+razlicite dimenzije matrica.*/
+
+#define n 3
+
+int main()
+{
+	int a[n][n], b[n][n], c[n][n],a2[n][n],b2[n][n],c2[n][n];
+	double start, end;
+
+
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			a[i][j] = rand() % 5;
+			a2[i][j] = a[i][j];
+			b[i][j] = rand() % 4;
+			b2[i][j] = b[i][j];
+			c[i][j] = 0;
+			c2[i][j] = 0;
+		}
+	}
+
+	printf("\nMatrica A \n");
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			printf("%d ", a[i][j]);
+		}
+		printf("\n");
+	}
+
+	printf("\nMatrica B \n");
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			printf("%d ", b[i][j]);
+		}
+		printf("\n");
+	}
+
+	clock_t start2;
+	double duration;
+
+	start2 = clock();
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			for (int k = 0; k < n; k++) {
+				
+				c[i][j] += a[i][k] * b[k][j];
+			}
+		}
+	}
+	duration = (std::clock() - start2) / (double)CLOCKS_PER_SEC;
+	printf("\nMatrica C kod iterativnog programa izracunata za %f sec\n", duration);
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			printf("%d ", c[i][j]);
+		}
+		printf("\n");
+	}
+
+	int i, j, k;
+	int broj_niti = omp_get_num_procs();
+	printf("Broj jezgara u sistemu je %d \n", broj_niti);
+	
+
+	omp_set_num_threads(broj_niti);
+	start = omp_get_wtime();
+#pragma omp parallel for default(none) shared(a,b,c) private(i,j,k)
+	for ( i = 0; i < n; i++) {
+			for ( j = 0; j < n; j++) {
+				printf("Nit %d racuna iteraciju %d, %d \n", omp_get_thread_num(), i, j);
+				for ( k = 0; k < n; k++) {
+					c2[i][j] += a2[i][k] * b2[k][j];
+				}
+			}
+		}
+
+	end = omp_get_wtime();
+	printf("\nMatrica C2 kod paralelizovanog programa izracunata za %f sec\n",(end-start));
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			printf("%d ", c2[i][j]);
+		}
+		printf("\n");
+	}
+
+
+}
+
+

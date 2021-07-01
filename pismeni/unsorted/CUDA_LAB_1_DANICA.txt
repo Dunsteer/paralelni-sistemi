@@ -1,0 +1,891 @@
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+4. Napisati CUDA program koji racuna sledeci izraz: A - B, gde su A i B kvadratne matrice
+Napisati kod za testiranje validnosti rezultata,
+uporedjivanjem sa vrednostima dobijenim izvrsavanjem sekvencijalnog koda koji
+izracunava isti izraz.*/
+__global__ void sub(int a[][N], int b[][N], int result[][N])
+{
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	result[i][j] = a[i][j] - b[i][j];
+}
+
+int main()
+{
+	int a[N][N], b[N][N], c[N][N];
+	int(*dev_a)[N];
+	int(*dev_b)[N];
+	int(*dev_c)[N];
+
+	cudaMalloc((void**)&dev_a, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N*N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+		for (int j = 0; j < N; j++)
+		{
+			a[i][j] = (i*3 + j*5);
+			b[i][j] = (i*3 + j*7 + 2)/3;
+		}
+
+	cudaMemcpy(dev_a, a, N*N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N*N * sizeof(int), cudaMemcpyHostToDevice);
+
+	sub << <N, N >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N*N * sizeof(int), cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", a[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", b[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	return 0;
+}
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+7. Napisati CUDA program koji racuna sledeci izraz: A + B, gde su A i B kvadratne matrice, i u
+novodobijenoj matrici sve vrednosti koje su vece od nekog k zameniti brojem p. Brojeve k i p
+unosi korisnik. Napisati kod za testiranje validnosti rezultata, uporedjivanjem sa vrednostima
+dobijenim izvrsavanjem sekvencijalnog koda koji izracunava isti izraz.*/
+__global__ void add(int a[][N], int b[][N], int result[][N])
+{
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	result[i][j] = a[i][j] + b[i][j];
+}
+
+__global__ void replace(int a[][N], int k, int p) {
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	if (a[i][j] > k) {
+		a[i][j] = p;
+	}
+}
+
+int main()
+{
+	int a[N][N], b[N][N], c[N][N];
+	int p = -10, k = 20;
+	int(*dev_a)[N];
+	int(*dev_b)[N];
+	int(*dev_c)[N];
+
+	cudaMalloc((void**)&dev_a, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N*N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+		for (int j = 0; j < N; j++)
+		{
+			a[i][j] = (i * 3 + j * 5);
+			b[i][j] = (i * 3 + j * 7 + 2) / 3;
+		}
+
+	cudaMemcpy(dev_a, a, N*N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N*N * sizeof(int), cudaMemcpyHostToDevice);
+
+	add << <N, N >> > (dev_a, dev_b, dev_c);
+	replace << <N, N >> > (dev_c, k, p);
+	cudaMemcpy(c, dev_c, N*N * sizeof(int), cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", a[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", b[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	return 0;
+}
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+8. Napisati CUDA program koji racuna sledeci izraz: A - B, gde su A i B kvadratne matrice, i u
+novodobijenoj matrici sve vrednosti koje su manje od nekog k zameniti brojem p. Brojeve k i p
+unosi korisnik. Napisati kod za testiranje validnosti rezultata, uporedjivanjem sa vrednostima
+dobijenim izvrsavanjem sekvencijalnog koda koji izracunava isti izraz.*/
+__global__ void sub(int a[][N], int b[][N], int result[][N])
+{
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	result[i][j] = a[i][j] - b[i][j];
+}
+
+__global__ void replace(int a[][N], int k, int p) {
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	if (a[i][j] < k) {
+		a[i][j] = p;
+	}
+}
+
+int main()
+{
+	int a[N][N], b[N][N], c[N][N];
+	int p = -10, k = 8;
+	int(*dev_a)[N];
+	int(*dev_b)[N];
+	int(*dev_c)[N];
+
+	cudaMalloc((void**)&dev_a, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N*N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+		for (int j = 0; j < N; j++)
+		{
+			a[i][j] = (i * 3 + j * 5);
+			b[i][j] = (i * 3 + j * 7 + 2) / 3;
+		}
+
+	cudaMemcpy(dev_a, a, N*N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N*N * sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", a[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", b[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	sub << <N, N >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N*N * sizeof(int), cudaMemcpyDeviceToHost);
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	replace << <N, N >> > (dev_c, k, p);
+	cudaMemcpy(c, dev_c, N*N * sizeof(int), cudaMemcpyDeviceToHost);
+
+	
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	return 0;
+}
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+6. Napisati CUDA program koji racuna sledeci izraz: A - B, gde su A i B vektori, i u
+novodobijenom vektoru sve vrednosti koje su manje od nekog k zameniti brojem p. Brojeve k i p
+unosi korisnik. Napisati kod za testiranje validnosti rezultata, uporedjivanjem sa vrednostima
+dobijenim izvrsavanjem sekvencijalnog koda koji izracunava isti izraz.*/
+__global__ void sub(int *a, int *b, int *result)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	result[i] = a[i] - b[i];
+}
+
+__global__ void replace(int *a, int k, int p) {
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (a[i] < k) {
+		a[i] = p;
+	}
+}
+
+int main()
+{
+	int a[N], b[N], c[N];
+	int p = -10, k = -2;
+	int *dev_a;
+	int *dev_b;
+	int *dev_c;
+
+	cudaMalloc((void**)&dev_a, N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+	{
+		a[i] = i * 3;
+		b[i] = (i * 3 + 7) / 2;
+	}
+
+	cudaMemcpy(dev_a, a, N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N * sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		printf("%d ", a[i]);
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		printf("%d ", b[i]);
+	}
+	printf("\n");
+
+	sub << <3, 2 >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost);
+	for (int i = 0; i < N; i++) {
+		printf("%d ", c[i]);
+	}
+	printf("\n");
+	replace << <N, N >> > (dev_c, k, p);
+	cudaMemcpy(c, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost);
+
+
+	for (int i = 0; i < N; i++) {
+		printf("%d ", c[i]);
+	}
+	printf("\n");
+	return 0;
+}
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+5. Napisati CUDA program koji racuna sledeci izraz: A + B, gde su A i B vektori, i u
+novodobijenom vektoru sve vrednosti koje su vece od nekog k zameniti brojem p. Brojeve k i p
+unosi korisnik. Napisati kod za testiranje validnosti rezultata, uporedjivanjem sa vrednostima
+dobijenim izvrsavanjem sekvencijalnog koda koji izracunava isti izraz.*/
+__global__ void add(int *a, int *b, int *result)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	result[i] = a[i] + b[i];
+}
+
+__global__ void replace(int *a, int k, int p) {
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (a[i] > k) {
+		a[i] = p;
+	}
+}
+
+int main()
+{
+	int a[N], b[N], c[N];
+	int p = -10, k = 5;
+	int *dev_a;
+	int *dev_b;
+	int *dev_c;
+
+	cudaMalloc((void**)&dev_a, N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+	{
+		a[i] = i * 3;
+		b[i] = (i * 3 + 7) / 2;
+	}
+
+	cudaMemcpy(dev_a, a, N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N * sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		printf("%d ", a[i]);
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		printf("%d ", b[i]);
+	}
+	printf("\n");
+
+	add << <N, N >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost);
+	for (int i = 0; i < N; i++) {
+		printf("%d ", c[i]);
+	}
+	printf("\n");
+	replace << <N, N >> > (dev_c, k, p);
+	cudaMemcpy(c, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost);
+
+
+	for (int i = 0; i < N; i++) {
+		printf("%d ", c[i]);
+	}
+	printf("\n");
+	return 0;
+}
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+11. Napisati CUDA program koji za data dva vektora A i B kreira treći, vektor C tako da je c[i][j] =
+max(A[i][j], B[i][j]). Napisati kod za testiranje validnosti rezultata, upoređivanjem sa vrednostima
+dobijenim izvršavanjem sekvencijalnog koda koji izračunava isti izraz.*/
+__global__ void max(int *a, int *b, int *result)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	int max = a[i];
+	if (max < b[i]) {
+		max = b[i];
+	}
+	result[i] = max;
+}
+
+
+int main()
+{
+	int a[N], b[N], c[N];
+	int *dev_a;
+	int *dev_b;
+	int *dev_c;
+
+	cudaMalloc((void**)&dev_a, N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+	{
+		a[i] = i * 3;
+		b[i] = (i * 3 + 7) / 2;
+	}
+
+	cudaMemcpy(dev_a, a, N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N * sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		printf("%d ", a[i]);
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		printf("%d ", b[i]);
+	}
+	printf("\n");
+
+	max << <N, N >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost);
+	for (int i = 0; i < N; i++) {
+		printf("%d ", c[i]);
+	}
+	printf("\n");
+
+
+	return 0;
+}
+
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+12. Napisati CUDA program koji za data dva vektora A i B kreira treći, vektor C tako da je c[i][j] =
+min(A[i][j], B[i][j]). Napisati kod za testiranje validnosti rezultata, upoređivanjem sa vrednostima
+dobijenim izvršavanjem sekvencijalnog koda koji izračunava isti izraz. Pripremiti se za diskusiju
+ponašanja sekvencijalnog i paralelnog programa.*/
+__global__ void min(int *a, int *b, int *result)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	int min = a[i];
+	if (min > b[i]) {
+		min = b[i];
+	}
+	result[i] = min;
+}
+
+
+int main()
+{
+	int a[N], b[N], c[N];
+	int *dev_a;
+	int *dev_b;
+	int *dev_c;
+
+	cudaMalloc((void**)&dev_a, N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+	{
+		a[i] = i * 13;
+		b[i] = (i * 3 + 7) / 2;
+	}
+
+	cudaMemcpy(dev_a, a, N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N * sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		printf("%d ", a[i]);
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		printf("%d ", b[i]);
+	}
+	printf("\n");
+
+	min << <N, N >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost);
+	for (int i = 0; i < N; i++) {
+		printf("%d ", c[i]);
+	}
+	printf("\n");
+
+
+	return 0;
+}
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+13. Napisati CUDA program koji za date dve kvadratne matrice A i B kreira treću, matricu C tako da
+je c[i][j] = max(A[i][j], B[i][j]). Napisati kod za testiranje validnosti rezultata, upoređivanjem sa
+vrednostima dobijenim izvršavanjem sekvencijalnog koda koji izračunava isti izraz. Pripremiti se
+za diskusiju ponašanja sekvencijalnog i paralelnog programa.*/
+__global__ void max(int a[][N], int b[][N], int result[][N])
+{
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	int max = a[i][j];
+	if (max < b[i][j]) {
+		max = b[i][j];
+	}
+	result[i][j] = max;
+}
+
+
+int main()
+{
+	int a[N][N], b[N][N], c[N][N];
+	int(*dev_a)[N];
+	int(*dev_b)[N];
+	int(*dev_c)[N];
+
+	cudaMalloc((void**)&dev_a, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N*N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++) {
+			a[i][j] = (i * 13 + j * 7) / 3;
+			b[i][j] = (i * 3 + j*7) / 2;
+		}
+	}
+
+	cudaMemcpy(dev_a, a, N*N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N*N * sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", a[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", b[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	max << <N, N >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N*N * sizeof(int), cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+
+	return 0;
+}
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+14. Napisati CUDA program koji za date dve kvadratne matrice A i B kreira treću, matricu C tako da
+je c[i][j] = min(A[i][j], B[i][j]). Napisati kod za testiranje validnosti rezultata, upoređivanjem sa
+vrednostima dobijenim izvršavanjem sekvencijalnog koda koji izračunava isti izraz. Pripremiti se
+za diskusiju ponašanja sekvencijalnog i paralelnog programa.*/
+__global__ void min(int a[][N], int b[][N], int result[][N])
+{
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	int min = a[i][j];
+	if (min > b[i][j]) {
+		min = b[i][j];
+	}
+	result[i][j] = min;
+}
+
+
+int main()
+{
+	int a[N][N], b[N][N], c[N][N];
+	int(*dev_a)[N];
+	int(*dev_b)[N];
+	int(*dev_c)[N];
+
+	cudaMalloc((void**)&dev_a, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N*N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++) {
+			a[i][j] = (i * 13 + j * 7) / 3;
+			b[i][j] = (i * 3 + j*7) / 2;
+		}
+	}
+
+	cudaMemcpy(dev_a, a, N*N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N*N * sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", a[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", b[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	min << <N, N >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N*N * sizeof(int), cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+
+	return 0;
+}
+
+
+
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+15. Napisati CUDA program koji računa sledeći izraz: A - B, gde su A i B vektori. Sve negativne
+vrednosti zameniti nulom. Napisati kod za testiranje validnosti rezultata, upoređivanjem sa
+vrednostima dobijenim izvršavanjem sekvencijalnog koda koji izračunava isti izraz. Pripremiti se
+za diskusiju ponašanja programa u zavisnosti od broja blokova i broja niti u okviru jednog bloka.*/
+__global__ void sub(int *a, int *b, int *result)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	result[i] = a[i] - b[i];
+}
+
+__global__ void replace(int *a)
+{
+	int i = blockIdx.x*blockDim.x + threadIdx.x;
+	if (a[i] < 0) {
+		a[i] = 0;
+	}
+}
+
+
+int main()
+{
+	int a[N], b[N], c[N];
+	int *dev_a;
+	int *dev_b;
+	int *dev_c;
+
+	cudaMalloc((void**)&dev_a, N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+	{
+		a[i] = i * 2 + 8;
+		b[i] = (i * 3 + 7);
+	}
+
+	cudaMemcpy(dev_a, a, N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N * sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		printf("%d ", a[i]);
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		printf("%d ", b[i]);
+	}
+	printf("\n");
+
+	sub << <N, N >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost);
+	for (int i = 0; i < N; i++) {
+		printf("%d ", c[i]);
+	}
+	printf("\n");
+
+	replace << <N, N >> > ( dev_c);
+	cudaMemcpy(c, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost);
+	for (int i = 0; i < N; i++) {
+		printf("%d ", c[i]);
+	}
+	printf("\n");
+
+	return 0;
+}
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+16. Napisati CUDA program koji računa sledeći izraz: A - B, gde su A i B kvadratne matrice. Sve
+negativne vrednosti zameniti nulom. Napisati kod za testiranje validnosti rezultata,
+upoređivanjem sa vrednostima dobijenim izvršavanjem sekvencijalnog koda koji izračunava isti
+izraz. Pripremiti se za diskusiju ponašanja programa u zavisnosti od broja blokova i broja niti u
+okviru jednog bloka.*/
+__global__ void sub(int a[][N], int b[][N], int result[][N])
+{
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	result[i][j] = a[i][j] - b[i][j];
+}
+
+__global__ void replace(int result[][N])
+{
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	if (result[i][j] < 0) {
+		result[i][j] = 0;
+	}
+}
+
+
+int main()
+{
+	int a[N][N], b[N][N], c[N][N];
+	int(*dev_a)[N];
+	int(*dev_b)[N];
+	int(*dev_c)[N];
+
+	cudaMalloc((void**)&dev_a, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_b, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_c, N*N * sizeof(int));
+
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++) {
+			a[i][j] = (i * 13 + j * 7) / 3;
+			b[i][j] = (i * 3 + j * 7) / 2;
+		}
+	}
+
+	cudaMemcpy(dev_a, a, N*N * sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_b, b, N*N * sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", a[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", b[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	sub << <N, N >> > (dev_a, dev_b, dev_c);
+	cudaMemcpy(c, dev_c, N*N * sizeof(int), cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	replace << <N, N >> > (dev_c);
+	cudaMemcpy(c, dev_c, N*N * sizeof(int), cudaMemcpyDeviceToHost);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", c[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	return 0;
+}
+
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+
+#include <stdio.h>
+#define N 4
+/*
+10. Napisati CUDA program koji broji broj ponavljanja elementa k u kvadratnoj matrici A. Napisati
+kod za testiranje validnosti rezultata, uporedivanjem sa vrednostima dobijenim izvršavanjem
+sekvencijalnog koda koji izracunava isti izraz. Pripremiti se za diskusiju ponašanja programa u
+zavisnosti od broja blokova i broja niti u okviru jednog bloka.*/
+__global__ void count(int a[][N], int *count, int k)
+{
+	int i = blockIdx.x;
+	int j = threadIdx.x;
+	if (a[i][j] == k)
+		*count += 1;
+
+}
+
+
+int main()
+{
+	int a[N][N];
+	int c = 0;
+	int k = 2;
+
+	int(*dev_a)[N];
+	int *dev_c;
+
+	cudaMalloc((void**)&dev_a, N*N * sizeof(int));
+	cudaMalloc((void**)&dev_c, sizeof(int));
+
+	for (int i = 0; i < N; i++)
+	{
+		for (int j = 0; j < N; j++) {
+			if ((i + j) % 2 == 0)
+				a[i][j] = i;
+			else
+				a[i][j] = j;
+		}
+	}
+
+	cudaMemcpy(dev_a, a, N*N * sizeof(int), cudaMemcpyHostToDevice);
+	//cudaMemcpy(dev_c, &c, sizeof(int), cudaMemcpyHostToDevice);
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++)
+		{
+			printf("%d ", a[i][j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
+	count << <N, N >> > (dev_a, dev_c, k);
+	cudaMemcpy(&c, dev_c,  sizeof(int), cudaMemcpyDeviceToHost);
+
+	printf("count: %d ", c);
+	printf("\n");
+
+	return 0;
+}
+
